@@ -11,126 +11,345 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>KoGaMa</string>
+   <string>Your worlds</string>
   </property>
   <layout class="QVBoxLayout" name="mainLayout">
+   <property name="leftMargin">
+    <number>0</number>
+   </property>
+   <property name="topMargin">
+    <number>0</number>
+   </property>
+   <property name="rightMargin">
+    <number>0</number>
+   </property>
+   <property name="bottomMargin">
+    <number>0</number>
+   </property>
    <item>
-    <widget class="QTabWidget" name="tabs">
-     <property name="currentIndex">
-      <number>0</number>
-     </property>
+    <widget class="QStackedWidget" name="pages">
      <widget class="QWidget" name="worldsTab">
-      <attribute name="title">
-       <string>Worlds</string>
-      </attribute>
-      <layout class="QHBoxLayout" name="worldsLayout">
+      <layout class="QVBoxLayout" name="worldsLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <property name="spacing">
+        <number>12</number>
+       </property>
        <item>
-        <widget class="QListWidget" name="worldsList"/>
-       </item>
-       <item>
-        <layout class="QVBoxLayout" name="worldButtons">
+        <layout class="QHBoxLayout" name="worldToolbar">
          <item>
-          <widget class="QPushButton" name="playButton">
-           <property name="text">
-            <string>Play</string>
+          <widget class="QLineEdit" name="worldSearchLineEdit">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>28</height>
+            </size>
            </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="buildButton">
-           <property name="text">
-            <string>Build</string>
+           <property name="placeholderText">
+            <string>Search your worlds...</string>
+           </property>
+           <property name="accessibleName">
+            <string>Search your worlds</string>
+           </property>
+           <property name="clearButtonEnabled">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="newButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>28</height>
+            </size>
+           </property>
            <property name="text">
-            <string>New World</string>
+            <string>&amp;New world...</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="importButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>28</height>
+            </size>
+           </property>
            <property name="text">
             <string>Import...</string>
            </property>
           </widget>
          </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="worldStatusLabel">
+         <property name="text">
+          <string>Loading your worlds...</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::PlainText</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListWidget" name="worldsList">
+         <property name="accessibleName">
+          <string>Your worlds</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="worldActionsLine">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="worldActions">
          <item>
-          <widget class="QPushButton" name="exportButton">
+          <widget class="QLabel" name="selectedWorldLabel">
            <property name="text">
-            <string>Export...</string>
+            <string>No world selected</string>
+           </property>
+           <property name="textFormat">
+            <enum>Qt::PlainText</enum>
            </property>
           </widget>
          </item>
          <item>
-          <spacer name="worldSpacer">
+          <spacer name="worldActionsSpacer">
            <property name="orientation">
-            <enum>Qt::Orientation::Vertical</enum>
+            <enum>Qt::Horizontal</enum>
            </property>
-           <property name="sizeHint" stdset="0">
+           <property name="sizeHint">
             <size>
              <width>20</width>
-             <height>40</height>
+             <height>20</height>
             </size>
            </property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QToolButton" name="moreWorldButton">
+           <property name="minimumSize">
+            <size>
+             <width>36</width>
+             <height>36</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>More</string>
+           </property>
+           <property name="text">
+            <string>•••</string>
+           </property>
+           <property name="popupMode">
+            <enum>QToolButton::InstantPopup</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="buildButton">
+           <property name="minimumSize">
+            <size>
+             <width>110</width>
+             <height>36</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>&amp;Build</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="playButton">
+           <property name="primary" stdset="0">
+            <bool>true</bool>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>140</width>
+             <height>36</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>&amp;Play</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
       </layout>
      </widget>
      <widget class="QWidget" name="avatarsTab">
-      <attribute name="title">
-       <string>Avatars</string>
-      </attribute>
-      <layout class="QHBoxLayout" name="avatarsLayout">
+      <layout class="QVBoxLayout" name="avatarsLayout">
+       <property name="leftMargin">
+        <number>0</number>
+       </property>
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <property name="rightMargin">
+        <number>0</number>
+       </property>
+       <property name="bottomMargin">
+        <number>0</number>
+       </property>
+       <property name="spacing">
+        <number>12</number>
+       </property>
        <item>
-        <widget class="QListWidget" name="avatarsList"/>
-       </item>
-       <item>
-        <layout class="QVBoxLayout" name="avatarButtons">
-         <item>
-          <widget class="QPushButton" name="useAvatarButton">
-           <property name="text">
-            <string>Use</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="avatarButton">
-           <property name="text">
-            <string>Avatar Editor</string>
-           </property>
-          </widget>
-         </item>
+        <layout class="QHBoxLayout" name="avatarToolbar">
          <item>
           <widget class="QPushButton" name="importAvatarButton">
+           <property name="minimumSize">
+            <size>
+             <width>0</width>
+             <height>28</height>
+            </size>
+           </property>
            <property name="text">
             <string>Import...</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="exportAvatarButton">
+          <spacer name="avatarToolbarSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="avatarStatusLabel">
+         <property name="text">
+          <string>Loading your avatars...</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::PlainText</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListWidget" name="avatarsList">
+         <property name="accessibleName">
+          <string>Your avatars</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="avatarActionsLine">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="avatarActions">
+         <item>
+          <widget class="QLabel" name="selectedAvatarLabel">
            <property name="text">
-            <string>Export...</string>
+            <string>No avatar selected</string>
+           </property>
+           <property name="textFormat">
+            <enum>Qt::PlainText</enum>
            </property>
           </widget>
          </item>
          <item>
-          <spacer name="avatarSpacer">
+          <spacer name="avatarActionSpacer">
            <property name="orientation">
-            <enum>Qt::Orientation::Vertical</enum>
+            <enum>Qt::Horizontal</enum>
            </property>
-           <property name="sizeHint" stdset="0">
+           <property name="sizeHint">
             <size>
              <width>20</width>
-             <height>40</height>
+             <height>20</height>
             </size>
            </property>
           </spacer>
+         </item>
+         <item>
+          <widget class="QToolButton" name="moreAvatarButton">
+           <property name="minimumSize">
+            <size>
+             <width>36</width>
+             <height>36</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>More</string>
+           </property>
+           <property name="text">
+            <string>•••</string>
+           </property>
+           <property name="popupMode">
+            <enum>QToolButton::InstantPopup</enum>
+           </property>
+           <property name="autoRaise">
+            <bool>true</bool>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="editAvatarButton">
+           <property name="minimumSize">
+            <size>
+             <width>110</width>
+             <height>36</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>&amp;Edit</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="useAvatarButton">
+           <property name="primary" stdset="0">
+            <bool>true</bool>
+           </property>
+           <property name="minimumSize">
+            <size>
+             <width>140</width>
+             <height>36</height>
+            </size>
+           </property>
+           <property name="text">
+            <string>&amp;Use</string>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
@@ -138,32 +357,8 @@
      </widget>
     </widget>
    </item>
-   <item>
-    <layout class="QHBoxLayout" name="bottomLayout">
-     <item>
-      <spacer name="bottomSpacer">
-       <property name="orientation">
-        <enum>Qt::Orientation::Horizontal</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>40</width>
-         <height>20</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item>
-      <widget class="QPushButton" name="closeButton">
-       <property name="text">
-        <string>Close</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
   </layout>
  </widget>
- <resources/>
- <connections/>
+ <resources />
+ <connections />
 </ui>

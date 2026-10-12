@@ -22,6 +22,7 @@ class InstallProgressDialog : public QDialog
 public:
     explicit InstallProgressDialog(const Version &version, const QString &name, QWidget *parent = nullptr);
     ~InstallProgressDialog();
+    QString installedPath() const { return m_dest; }
 
 protected:
     void reject() override;

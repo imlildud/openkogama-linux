@@ -1,0 +1,447 @@
+#include "serverspage.h"
+#include "centereddelegate.h"
+#include "tilegrid.h"
+#include "settings.h"
+#include <QBuffer>
+#include <QFrame>
+#include <QToolButton>
+#include <QStyle>
+#include <QMenu>
+#include <QGuiApplication>
+#include <QClipboard>
+#include <QDialog>
+#include <QDialogButtonBox>
+#include <QEvent>
+#include <QFormLayout>
+#include <QImageReader>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QPainter>
+#include <QPushButton>
+#include <QShortcut>
+#include <QTimer>
+#include <QUrl>
+#include <QVBoxLayout>
+#include <algorithm>
+#include <memory>
+
+namespace {
+constexpr int TitleRole = Qt::UserRole + 1;
+constexpr int StatusRole = Qt::UserRole + 2;
+constexpr qint64 ThumbnailLimit = 256 * 1024;
+
+QString titleText(const QString &text)
+{
+    QString title;
+    int length = 0;
+    for (char32_t ch : text.simplified().toUcs4()) {
+        if (!QChar::isPrint(ch)) continue;
+        title += QString::fromUcs4(&ch, 1);
+        if (++length == 40) break;
+    }
+    return title.trimmed();
+}
+
+QString shortAddress(const QString &address)
+{
+    const QUrl url(address);
+    if (url.host().isEmpty()) return address;
+    const bool defaultPort = url.port() == -1 || (url.scheme() == "http" && url.port() == 8080) || (url.scheme() == "https" && url.port() == 443);
+    return defaultPort ? url.host() : url.host() + ":" + QString::number(url.port());
+}
+
+QString sharedAddress(const QString &address)
+{
+    return QUrl(address).scheme() == "https" ? address : shortAddress(address);
+}
+
+QIcon imageTile(const QByteArray &bytes, const QColor &background)
+{
+    QPixmap image;
+    if (!bytes.isEmpty() && image.loadFromData(bytes, "PNG"))
+        return TileGrid::icon(TileGrid::cover(image, TileGrid::WideImage));
+    return TileGrid::icon(TileGrid::placeholder(TileGrid::WideImage, background));
+}
+
+QByteArray normalizedThumbnail(QByteArray bytes)
+{
+    if (bytes.isEmpty() || bytes.size() > ThumbnailLimit) return {};
+    QBuffer input(&bytes);
+    input.open(QIODevice::ReadOnly);
+    QImageReader reader(&input);
+    const QByteArray format = reader.format().toLower();
+    if (format != "png" && format != "jpeg" && format != "webp") return {};
+    const QSize size = reader.size();
+    if (!size.isValid() || size.width() > 4096 || size.height() > 4096) return {};
+    if (size.width() > 1024 || size.height() > 1024)
+        reader.setScaledSize(size.scaled(QSize(1024, 1024), Qt::KeepAspectRatio));
+    const QImage image = reader.read();
+    if (image.isNull()) return {};
+    QImage tile(TileGrid::WideImage, QImage::Format_ARGB32_Premultiplied);
+    tile.fill(Qt::transparent);
+    const double scale = std::max(double(tile.width()) / image.width(), double(tile.height()) / image.height());
+    const QSizeF crop(tile.width() / scale, tile.height() / scale);
+    QPainter painter(&tile);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform);
+    painter.drawImage(QRectF(tile.rect()), image, QRectF((image.width() - crop.width()) / 2,
+        (image.height() - crop.height()) / 2, crop.width(), crop.height()));
+    painter.end();
+    QByteArray result;
+    QBuffer output(&result);
+    output.open(QIODevice::WriteOnly);
+    tile.save(&output, "PNG");
+    return result.size() <= ThumbnailLimit ? result : QByteArray();
+}
+}
+
+ServersPage::ServersPage(QWidget *parent)
+    : QWidget(parent), m_net(new QNetworkAccessManager(this)), m_list(new QListWidget(this)),
+      m_search(new QLineEdit(this)), m_empty(new QLabel(this)), m_selected(new QLabel(this)),
+      m_address(new QLabel(this)), m_more(new QToolButton(this)), m_join(new QPushButton("&Join", this))
+{
+    setObjectName("serversPage");
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 12, 0, 0);
+    layout->setSpacing(12);
+
+    auto *toolbar = new QHBoxLayout;
+    m_search->setPlaceholderText("Search your servers...");
+    m_search->setAccessibleName("Search servers");
+    m_search->setClearButtonEnabled(true);
+    m_search->setMinimumHeight(28);
+    auto *add = new QPushButton("Add server...", this);
+    add->setObjectName("addServerButton");
+    add->setMinimumHeight(28);
+    toolbar->addWidget(m_search, 1);
+    toolbar->addWidget(add);
+    layout->addLayout(toolbar);
+
+    m_empty->setWordWrap(true);
+    m_empty->setTextFormat(Qt::PlainText);
+    layout->addWidget(m_empty);
+
+    m_list->setObjectName("serversList");
+    m_list->setAccessibleName("Your servers");
+    TileGrid::setup(m_list, this);
+    layout->addWidget(m_list, 1);
+
+    auto *line = new QFrame(this);
+    line->setObjectName("serverActionsLine");
+    line->setFrameShape(QFrame::HLine);
+    line->setFrameShadow(QFrame::Sunken);
+    layout->addWidget(line);
+
+    auto *actions = new QHBoxLayout;
+    m_selected->setObjectName("selectedServerLabel");
+    m_selected->setTextFormat(Qt::PlainText);
+    m_address->setObjectName("selectedServerAddress");
+    m_address->setTextFormat(Qt::PlainText);
+    m_address->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    m_more->setObjectName("moreServerButton");
+    m_more->setText(QString::fromUtf8("\u2022\u2022\u2022"));
+    m_more->setToolTip("More");
+    m_more->setMinimumSize(36, 36);
+    m_more->setAutoRaise(true);
+    m_more->setPopupMode(QToolButton::InstantPopup);
+    auto *menu = new QMenu(this);
+    menu->addAction("Copy address", this, &ServersPage::copyAddress);
+    menu->addSeparator();
+    menu->addAction("Remove...", this, &ServersPage::removeServer);
+    m_more->setMenu(menu);
+    m_join->setObjectName("joinServerButton");
+    m_join->setProperty("primary", true);
+    m_join->setMinimumSize(140, 36);
+    actions->addWidget(m_selected);
+    actions->addWidget(m_address);
+    actions->addStretch(1);
+    actions->addWidget(m_more);
+    actions->addWidget(m_join);
+    layout->addLayout(actions);
+
+    connect(add, &QPushButton::clicked, this, &ServersPage::addServer);
+    connect(m_join, &QPushButton::clicked, this, &ServersPage::join);
+    connect(m_list, &QListWidget::itemActivated, this, [this]() { join(); });
+    connect(m_list, &QListWidget::currentItemChanged, this, [this]() { updateActions(); });
+    connect(m_list, &QListWidget::customContextMenuRequested, this, &ServersPage::showMenu);
+    connect(m_search, &QLineEdit::textChanged, this, [this]() { filter(); });
+    auto *shortcut = new QShortcut(QKeySequence::Refresh, this);
+    shortcut->setObjectName("refreshServersShortcut");
+    shortcut->setContext(Qt::WidgetWithChildrenShortcut);
+    connect(shortcut, &QShortcut::activated, this, &ServersPage::refresh);
+    auto *remove = new QShortcut(QKeySequence::Delete, m_list);
+    remove->setContext(Qt::WidgetShortcut);
+    connect(remove, &QShortcut::activated, this, &ServersPage::removeServer);
+    auto *timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &ServersPage::refresh);
+    timer->start(30000);
+    load(Settings::currentServer());
+    refresh();
+}
+
+void ServersPage::setCanJoin(bool enabled)
+{
+    m_canJoin = enabled;
+    updateActions();
+}
+
+QString ServersPage::selectedAddress() const
+{
+    const auto *item = m_list->currentItem();
+    return item && !item->isHidden() ? item->data(Qt::UserRole).toString() : QString();
+}
+
+QListWidgetItem *ServersPage::find(const QString &address) const
+{
+    for (int i = 0; i < m_list->count(); ++i)
+        if (m_list->item(i)->data(Qt::UserRole).toString() == address) return m_list->item(i);
+    return nullptr;
+}
+
+void ServersPage::load(const QString &select)
+{
+    m_list->clear();
+    for (const GameServer &server : Settings::servers()) {
+        const QString title = titleText(server.title.isEmpty()
+            ? (server.name.isEmpty() ? server.address : server.name) : server.title);
+        auto *item = new QListWidgetItem(imageTile(server.thumbnail, palette().color(QPalette::Button)), title, m_list);
+        item->setData(Qt::UserRole, server.address);
+        item->setData(TitleRole, title);
+        setStatus(server.address, "Checking...");
+        if (server.address == select) m_list->setCurrentItem(item);
+    }
+    if (!m_list->currentItem() && m_list->count()) m_list->setCurrentRow(0);
+    filter();
+}
+
+void ServersPage::filter()
+{
+    const QString search = m_search->text().trimmed();
+    QListWidgetItem *first = nullptr;
+    for (int i = 0; i < m_list->count(); ++i) {
+        auto *item = m_list->item(i);
+        const bool visible = item->data(TitleRole).toString().contains(search, Qt::CaseInsensitive)
+            || item->data(Qt::UserRole).toString().contains(search, Qt::CaseInsensitive);
+        item->setHidden(!visible);
+        if (visible && !first) first = item;
+    }
+    if (!m_list->currentItem() || m_list->currentItem()->isHidden()) m_list->setCurrentItem(first);
+    m_empty->setText(m_list->count() == 0 ? "Add a server by its address, then click Join to play."
+        : "No servers match your search.");
+    m_empty->setVisible(!first);
+    updateActions();
+}
+
+void ServersPage::updateActions()
+{
+    const QString address = selectedAddress();
+    const auto *item = find(address);
+    m_selected->setText(item ? item->data(TitleRole).toString() : "No server selected");
+    m_address->setText(shortAddress(address));
+    m_more->setEnabled(!address.isEmpty());
+    m_join->setEnabled(m_canJoin && !address.isEmpty());
+    m_join->setToolTip(m_canJoin ? QString() : "Add a game version first");
+}
+
+void ServersPage::setStatus(const QString &address, const QString &status)
+{
+    if (auto *item = find(address)) {
+        item->setData(StatusRole, status);
+        item->setData(CenteredDelegate::SubtitleRole, status);
+        item->setToolTip(shortAddress(address) + "\n" + status);
+    }
+}
+
+void ServersPage::get(const QString &url, qint64 limit, std::function<void(int, const QByteArray &)> done)
+{
+    QNetworkRequest request{QUrl(url)};
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::ManualRedirectPolicy);
+    request.setTransferTimeout(8000);
+    auto *reply = m_net->get(request);
+    reply->setReadBufferSize(limit + 1);
+    auto data = std::make_shared<QByteArray>();
+    auto collect = [reply, data, limit]() {
+        *data += reply->read(limit + 1 - data->size());
+        if (data->size() > limit) reply->abort();
+    };
+    connect(reply, &QNetworkReply::readyRead, this, collect);
+    connect(reply, &QNetworkReply::metaDataChanged, this, [reply, limit]() {
+        if (reply->header(QNetworkRequest::ContentLengthHeader).toLongLong() > limit) reply->abort();
+    });
+    QTimer::singleShot(10000, reply, [reply]() { if (!reply->isFinished()) reply->abort(); });
+    connect(reply, &QNetworkReply::finished, this, [reply, data, limit, collect, done]() {
+        collect();
+        const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        const bool ok = reply->error() == QNetworkReply::NoError && data->size() <= limit;
+        reply->deleteLater();
+        done(ok || status == 404 ? status : 0, ok ? *data : QByteArray());
+    });
+}
+
+void ServersPage::refresh()
+{
+    for (const GameServer &server : Settings::servers()) probe(server.address);
+}
+
+void ServersPage::probe(const QString &address)
+{
+    if (m_pending.contains(address)) return;
+    m_pending.insert(address);
+    get(address + "/api/server", 4096, [this, address](int status, const QByteArray &data) {
+        if (status == 404) {
+            get(address + "/ping", 4096, [this, address](int code, const QByteArray &) {
+                m_pending.remove(address);
+                setStatus(address, code == 200 ? "Online" : "Offline");
+            });
+            return;
+        }
+        m_pending.remove(address);
+        const QJsonDocument document = QJsonDocument::fromJson(data);
+        if (status != 200 || !document.isObject()) {
+            setStatus(address, "Offline");
+            return;
+        }
+        auto servers = Settings::servers();
+        auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
+        if (it == servers.end()) return;
+        const QString title = titleText(document.object().value("title").toString());
+        if (!title.isEmpty()) {
+            it->title = title;
+            Settings::setServers(servers);
+            if (auto *item = find(address)) {
+                item->setData(TitleRole, title);
+                item->setText(title);
+            }
+        }
+        setStatus(address, "Online");
+        filter();
+        if (document.object().value("thumbnail").toString() == "/api/server/thumbnail") fetchThumbnail(address);
+    });
+}
+
+void ServersPage::fetchThumbnail(const QString &address)
+{
+    get(address + "/api/server/thumbnail", ThumbnailLimit, [this, address](int status, const QByteArray &data) {
+        if (status != 200) return;
+        const QByteArray thumbnail = normalizedThumbnail(data);
+        if (thumbnail.isEmpty()) return;
+        auto servers = Settings::servers();
+        auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
+        if (it == servers.end()) return;
+        it->thumbnail = thumbnail;
+        Settings::setServers(servers);
+        if (auto *item = find(address)) item->setIcon(imageTile(thumbnail, palette().color(QPalette::Button)));
+    });
+}
+
+void ServersPage::addServer()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Add server");
+    dialog.setMinimumWidth(380);
+    auto *name = new QLineEdit(&dialog);
+    name->setMaxLength(40);
+    name->setPlaceholderText("Optional name");
+    name->setMinimumHeight(28);
+    auto *address = new QLineEdit(&dialog);
+    address->setPlaceholderText("192.168.1.20 or example.com");
+    address->setMinimumHeight(28);
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(16, 16, 16, 16);
+    layout->setSpacing(16);
+    auto *form = new QFormLayout;
+    form->setSpacing(12);
+    form->addRow("Name:", name);
+    form->addRow("Address:", address);
+    layout->addLayout(form);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    auto *confirm = buttons->button(QDialogButtonBox::Ok);
+    confirm->setText("Add");
+    confirm->setProperty("primary", true);
+    confirm->style()->polish(confirm);
+    confirm->setEnabled(false);
+    connect(address, &QLineEdit::textChanged, &dialog, [buttons](const QString &text) {
+        buttons->button(QDialogButtonBox::Ok)->setEnabled(!text.trimmed().isEmpty());
+    });
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
+        const QString entered = address->text().trimmed();
+        const bool explicitScheme = entered.contains("://");
+        QUrl url(explicitScheme ? entered : "http://" + entered);
+        if (!url.isValid() || url.host().isEmpty() || (url.scheme() != "http" && url.scheme() != "https")
+            || !url.userInfo().isEmpty() || url.hasQuery() || url.hasFragment()
+            || (!url.path().isEmpty() && url.path() != "/") || url.port() == 0) {
+            QMessageBox::warning(&dialog, "Add server", "Enter a server host with an optional port, or an HTTP/HTTPS address.");
+            return;
+        }
+        if (!explicitScheme && url.port() == -1) url.setPort(8080);
+        const QString normalized = url.toString(QUrl::StripTrailingSlash);
+        auto servers = Settings::servers();
+        auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == normalized; });
+        const QString title = titleText(name->text().trimmed().isEmpty() ? url.host() : name->text());
+        if (it == servers.end()) servers.append({title, normalized, {}, {}});
+        else it->name = title;
+        Settings::setServers(servers);
+        Settings::setCurrentServer(normalized);
+        load(normalized);
+        refresh();
+        dialog.accept();
+    });
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    address->setFocus();
+    dialog.exec();
+}
+
+void ServersPage::removeServer()
+{
+    const QString address = selectedAddress();
+    if (address.isEmpty()) return;
+    const QString title = find(address)->data(TitleRole).toString();
+    if (QMessageBox::question(this, "Remove server", "Remove \"" + title + "\" from your servers?") != QMessageBox::Yes) return;
+    auto servers = Settings::servers();
+    servers.removeIf([&](const GameServer &server) { return server.address == address; });
+    Settings::setServers(servers);
+    if (Settings::currentServer() == address) Settings::setCurrentServer({});
+    load();
+    refresh();
+}
+
+void ServersPage::copyAddress()
+{
+    const QString address = selectedAddress();
+    if (!address.isEmpty()) QGuiApplication::clipboard()->setText(sharedAddress(address));
+}
+
+void ServersPage::showMenu(const QPoint &pos)
+{
+    QListWidgetItem *item = m_list->itemAt(pos);
+    if (!item) return;
+    m_list->setCurrentItem(item);
+    QMenu menu(this);
+    QAction *joinAction = menu.addAction("Join", this, &ServersPage::join);
+    joinAction->setEnabled(m_canJoin);
+    menu.addAction("Copy address", this, &ServersPage::copyAddress);
+    menu.addSeparator();
+    menu.addAction("Remove...", this, &ServersPage::removeServer);
+    menu.exec(m_list->viewport()->mapToGlobal(pos));
+}
+
+void ServersPage::join()
+{
+    const QString address = selectedAddress();
+    if (!m_canJoin || address.isEmpty()) return;
+    Settings::setCurrentServer(address);
+    emit joinRequested(address);
+}
+
+bool ServersPage::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == m_list && (event->type() == QEvent::Resize || event->type() == QEvent::Show))
+        TileGrid::fit(m_list, TileGrid::WideTile);
+    return QWidget::eventFilter(watched, event);
+}

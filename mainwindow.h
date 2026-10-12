@@ -8,6 +8,12 @@
 #include <QEvent>
 #include <QObject>
 #include <functional>
+#include <QPointer>
+#include <QSet>
+
+class WorldsDialog;
+class ServersPage;
+class QProcess;
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -32,17 +38,29 @@ private slots:
     void deleteInstance();
 
 private:
-    void loadInstances();
+    void loadInstances(const QString &selectPath = {});
+    void updateInstanceActions();
+    void updatePlayPage();
+    void onVersionChanged();
     void fetchVersions(std::function<void()> done = nullptr);
-    void launchInstance(const QString &path);
+    bool launchInstance(const QString &path);
+    bool prepareInstance(const QString &path, QString *executable);
+    void joinServer(const QString &address);
+    bool hasRemoteGames() const;
+    bool startLocalServer(const QString &version, QProcess **server);
 
     Ui::MainWindow *ui;
     QStandardItemModel *instances;
     QByteArray m_versionsJson;
     QString m_versionsError;
 
-protected:
-    bool eventFilter(QObject *watched, QEvent *event) override;
+    QPointer<WorldsDialog> m_worlds;
+    ServersPage *m_servers;
+    QList<QPointer<QProcess>> m_remoteClients;
+    QString m_activePath;
+    bool m_installing = false;
+    bool m_localReady = false;
+    QSet<QString> m_checkedVersions;
 };
 
 #endif // MAINWINDOW_H

@@ -15,7 +15,7 @@ static constexpr int PingTimeout = 150;
 static constexpr int AssetsEnd = 50;
 
 static QNetworkRequest pingRequest() {
-    QNetworkRequest request(QUrl(ServerUrl + "/ping"));
+    QNetworkRequest request(QUrl(LocalServerUrl + "/ping"));
     request.setTransferTimeout(PingTimeout);
     return request;
 }
@@ -127,6 +127,6 @@ void LaunchDialog::setStep(const QString &status, int progress) {
 
 void LaunchDialog::stopServer(QProcess *server) {
     auto *net = new QNetworkAccessManager(server);
-    net->get(QNetworkRequest(QUrl(ServerUrl + "/shutdown")));
+    net->get(QNetworkRequest(QUrl(LocalServerUrl + "/shutdown")));
     QTimer::singleShot(5000, server, [server]() { server->kill(); });
 }

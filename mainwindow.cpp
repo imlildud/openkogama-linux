@@ -6,9 +6,12 @@
 #include "assetinstaller.h"
 #include "settingsdialog.h"
 #include "worldsdialog.h"
-#include "centereddelegate.h"
+#include "serverspage.h"
+#include "gamelauncher.h"
+#include "settings.h"
 #include "creditsdialog.h"
 #include "webplayerruntime.h"
+#include <QApplication>
 #include <QDesktopServices>
 #include <QStandardPaths>
 #include <QDir>
@@ -30,8 +33,38 @@
 #include <QProgressDialog>
 #include <QFutureWatcher>
 #include <QtConcurrent>
+#include <QInputDialog>
+#include <QLineEdit>
+#include <QSignalBlocker>
+#include <QTimer>
+#include <QUrl>
+#include <QStyle>
+#include <QPushButton>
+#include <QVBoxLayout>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include <QVersionNumber>
+#include <algorithm>
 
 static constexpr int NameRole = Qt::UserRole + 1;
+static constexpr int VersionRole = Qt::UserRole + 2;
+static constexpr int UnityRole = Qt::UserRole + 3;
+
+static QString versionTitle(const QString &name, const QString &version) {
+    if (version.isEmpty()) return name;
+    return name == version ? "KoGaMa " + version : name + " (KoGaMa " + version + ")";
+}
+
+static QIcon instanceIcon(const QDir &dir, const QFileIconProvider &provider) {
+    const QString cached = dir.filePath("icon.png");
+    if (QFile::exists(cached)) return QIcon(cached);
+    const QString exe = dir.entryList({"*.exe"}, QDir::Files).value(0);
+    if (exe.isEmpty()) return QIcon(":/unknown.png");
+    const QPixmap pixmap = provider.icon(QFileInfo(dir.filePath(exe))).pixmap(64);
+    if (pixmap.isNull()) return QIcon(":/unknown.png");
+    pixmap.save(cached);
+    return QIcon(pixmap);
+}
 
 static QString instancesBase() {
     return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/instances";
@@ -75,67 +108,64 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
     setWindowTitle("OpenKogama Launcher");
-
+    ui->versionCombo->setPlaceholderText("No versions installed");
+    ui->mainTabs->setCornerWidget(ui->headerBar, Qt::TopRightCorner);
+    m_servers = new ServersPage(this);
+    ui->mainTabs->insertTab(1, m_servers, "&Servers");
+    connect(m_servers, &ServersPage::joinRequested, this, &MainWindow::joinServer);
+    ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
     connect(ui->actionInstall, &QAction::triggered, this, &MainWindow::onInstallTriggered);
     connect(ui->actionDiscord, &QAction::triggered, this, &MainWindow::onDiscordTriggered);
     connect(ui->actionCredits, &QAction::triggered, this, [this]() { CreditsDialog(this).exec(); });
     connect(ui->actionLaunch, &QAction::triggered, this, &MainWindow::onLaunchTriggered);
     connect(ui->actionSettings, &QAction::triggered, this, [this]() { SettingsDialog(this).exec(); });
-    ui->actionDiscord->setIcon(QIcon(":/discord.png"));
-    ui->actionInstall->setIcon(QIcon(":/install.png"));
-    ui->actionLaunch->setIcon(QIcon(":/launch.png"));
-    ui->actionLaunch->setText(QString());
-    ui->actionLaunch->setToolTip("Launch");
+    connect(ui->addVersionButton, &QToolButton::clicked, this, &MainWindow::onInstallTriggered);
+    auto *versionMenu = new QMenu(this);
+    versionMenu->addAction(ui->actionRenameVersion);
+    versionMenu->addAction(ui->actionDuplicateVersion);
+    versionMenu->addSeparator();
+    versionMenu->addAction(ui->actionDeleteVersion);
+    ui->moreVersionButton->setMenu(versionMenu);
+    connect(ui->firstVersionButton, &QPushButton::clicked, this, &MainWindow::onInstallTriggered);
+    connect(ui->openWorldsButton, &QPushButton::clicked, this, &MainWindow::onLaunchTriggered);
+    connect(ui->useVersionButton, &QPushButton::clicked, this, &MainWindow::onLaunchTriggered);
+    connect(ui->actionRenameVersion, &QAction::triggered, this, &MainWindow::renameInstance);
+    connect(ui->actionDuplicateVersion, &QAction::triggered, this, &MainWindow::duplicateInstance);
+    connect(ui->actionDeleteVersion, &QAction::triggered, this, &MainWindow::deleteInstance);
 
     instances = new QStandardItemModel(this);
     ui->instancesView->setModel(instances);
     ui->instancesView->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    ui->instancesView->setViewMode(QListView::IconMode);
-    ui->instancesView->setIconSize(QSize(64, 64));
-    ui->instancesView->setGridSize(QSize(140, 100));
-    ui->instancesView->setResizeMode(QListView::Adjust);
-    ui->instancesView->setMovement(QListView::Static);
-    ui->instancesView->setWordWrap(true);
-    ui->instancesView->setUniformItemSizes(true);
-    ui->instancesView->setFrameShape(QFrame::NoFrame);
-    ui->instancesView->setFocusPolicy(Qt::NoFocus);
-    ui->instancesView->setTextElideMode(Qt::ElideNone);
-    ui->instancesView->setStyleSheet(
-        "QListView { border: 0; outline: 0; background: #2b2b2b; }"
-        "QListView::item { color: #dddddd; padding: 4px; border-radius: 6px; }"
-        "QListView::item:hover { background: #1f1f1f; color: #ffffff; }"
-        "QListView::item:selected { background: #181818; border-radius: 6px; color: #ffffff; }");
-    ui->instancesView->setItemDelegate(new CenteredDelegate(ui->instancesView));
+    ui->instancesView->setIconSize(QSize(32, 32));
+    ui->instancesView->setSpacing(0);
     ui->instancesView->setContextMenuPolicy(Qt::CustomContextMenu);
     connect(ui->instancesView, &QListView::customContextMenuRequested, this, &MainWindow::showInstanceMenu);
-    auto *renameShortcut = new QShortcut(QKeySequence(Qt::Key_F2), ui->instancesView);
-    connect(renameShortcut, &QShortcut::activated, this, &MainWindow::renameInstance);
+    connect(ui->instancesView->selectionModel(), &QItemSelectionModel::currentChanged, this, [this]() { updateInstanceActions(); });
     connect(instances, &QStandardItemModel::itemChanged, this, &MainWindow::onInstanceRenamed);
+    auto *renameShortcut = new QShortcut(QKeySequence(Qt::Key_F2), ui->instancesView);
+    renameShortcut->setContext(Qt::WidgetShortcut);
+    connect(renameShortcut, &QShortcut::activated, this, &MainWindow::renameInstance);
     auto *deleteShortcut = new QShortcut(QKeySequence::Delete, ui->instancesView);
+    deleteShortcut->setContext(Qt::WidgetShortcut);
     connect(deleteShortcut, &QShortcut::activated, this, &MainWindow::deleteInstance);
-
-    connect(ui->instancesView, &QListView::doubleClicked, this, [this](const QModelIndex &index) {
-        QString dataPath = index.data(Qt::UserRole).toString();
-        if (dataPath == "action_add_instance") {
-            onInstallTriggered();
-        } else {
-            launchInstance(dataPath);
-        }
+    connect(ui->instancesView, &QListView::activated, this, [this](const QModelIndex &index) {
+        if (launchInstance(index.data(Qt::UserRole).toString()))
+            ui->mainTabs->setCurrentWidget(ui->playTab);
+    });
+    connect(ui->versionCombo, &QComboBox::currentIndexChanged, this, [this]() { onVersionChanged(); });
+    connect(ui->mainTabs, &QTabWidget::currentChanged, this, [this]() {
+        if (m_worlds && ui->mainTabs->currentWidget() == ui->avatarsTab)
+            m_worlds->showAvatars();
+        updateInstanceActions();
     });
 
-    ui->instancesView->setMouseTracking(true);
-    ui->instancesView->viewport()->installEventFilter(this);
-
-    ui->menuBar->setStyleSheet(
-        "QMenuBar { background: #2b2b2b; border-bottom: 1px solid #1a1a1a; }"
-        "QMenuBar::item { background: transparent; color: #dddddd; padding: 4px 8px; border-radius: 4px; }"
-        "QMenuBar::item:selected { background: #3d3d3d; color: #ffffff; }"
-        "QMenuBar::item:pressed { background: #1f1f1f; }");
-
-    ui->verticalLayout->setContentsMargins(0, 0, 0, 0);
-
+    QFile catalog(":/versions.json");
+    if (catalog.open(QIODevice::ReadOnly))
+        m_versionsJson = catalog.readAll();
     loadInstances();
     fetchVersions();
+    if (ui->versionCombo->currentIndex() >= 0)
+        QTimer::singleShot(0, this, &MainWindow::onLaunchTriggered);
 }
 
 void MainWindow::fetchVersions(std::function<void()> done) {
@@ -161,74 +191,141 @@ void MainWindow::fetchVersions(std::function<void()> done) {
     });
 }
 
-void MainWindow::loadInstances() {
+void MainWindow::loadInstances(const QString &selectPath) {
+    QString wanted = selectPath;
+    if (wanted.isEmpty()) wanted = ui->versionCombo->currentData().toString();
+    if (wanted.isEmpty()) wanted = Settings::lastInstance();
+    QSignalBlocker comboBlocker(ui->versionCombo);
     instances->clear();
-
-    QIcon plusIcon;
-    QPixmap plusPix(":/lemonplus.png");
-    plusIcon.addPixmap(plusPix, QIcon::Normal);
-    plusIcon.addPixmap(plusPix, QIcon::Selected);
-
-    auto *plusItem = new QStandardItem(plusIcon, "Add New");
-    plusItem->setToolTip("Click here to install new KoGaMa instance.");
-    plusItem->setData("action_add_instance", Qt::UserRole);
-    instances->appendRow(plusItem);
-
+    ui->versionCombo->clear();
     QDir dir(instancesBase());
-
     QFileIconProvider iconProvider;
-    const auto folders = dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-    for (const QString &folder : folders) {
+    QList<QPair<QString, QJsonObject>> found;
+    for (const QString &folder : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
+        QFile file(dir.filePath(folder) + "/instance.json");
+        if (file.open(QIODevice::ReadOnly))
+            found.append({folder, QJsonDocument::fromJson(file.readAll()).object()});
+    }
+    std::stable_sort(found.begin(), found.end(), [](const auto &a, const auto &b) {
+        return QVersionNumber::fromString(a.second.value("version").toString()) < QVersionNumber::fromString(b.second.value("version").toString());
+    });
+    for (const auto &[folder, meta] : std::as_const(found)) {
         QDir instanceDir(dir.filePath(folder));
-
-        QFile f(instanceDir.filePath("instance.json"));
-        if (!f.open(QIODevice::ReadOnly)) continue;
-
-        QJsonObject meta = QJsonDocument::fromJson(f.readAll()).object();
-        QString name = meta.value("name").toString();
         QString version = meta.value("version").toString();
+        QString name = meta.value("name").toString();
+        if (name.isEmpty()) name = version.isEmpty() ? folder : version;
 
-        QPixmap pix(":/unknown.png");
-        const auto exes = instanceDir.entryList({"*.exe"}, QDir::Files);
-        if (!exes.isEmpty())
-            pix = iconProvider.icon(QFileInfo(instanceDir.filePath(exes.first()))).pixmap(64, 64);
-
-        QIcon icon;
-        icon.addPixmap(pix, QIcon::Normal);
-        icon.addPixmap(pix, QIcon::Selected);
-
+        const QIcon icon = instanceIcon(instanceDir, iconProvider);
         auto *item = new QStandardItem(icon, name);
         item->setToolTip("KoGaMa " + version);
         item->setData(instanceDir.path(), Qt::UserRole);
         item->setData(name, NameRole);
+        item->setData(version, VersionRole);
+        item->setData(meta.value("unityVersion").toString(), UnityRole);
         instances->appendRow(item);
+        ui->versionCombo->addItem(icon, versionTitle(name, version), instanceDir.path());
     }
+    int selected = ui->versionCombo->findData(wanted);
+    if (selected < 0 && ui->versionCombo->count() > 0) selected = 0;
+    ui->versionCombo->setCurrentIndex(selected);
+    if (selected >= 0) {
+        ui->instancesView->setCurrentIndex(instances->index(selected, 0));
+        Settings::setLastInstance(ui->versionCombo->currentData().toString());
+    }
+    ui->versionCombo->setEnabled(selected >= 0);
+    ui->noVersionsLabel->setVisible(selected < 0);
+    ui->instancesView->setVisible(selected >= 0);
+    ui->selectedVersionGroup->setVisible(selected >= 0);
+    updateInstanceActions();
+    updatePlayPage();
+}
+
+void MainWindow::updateInstanceActions() {
+    const QModelIndex index = ui->instancesView->currentIndex();
+    bool selected = index.isValid();
+    ui->useVersionButton->setEnabled(selected);
+    ui->moreVersionButton->setEnabled(selected);
+    ui->actionRenameVersion->setEnabled(selected);
+    ui->actionDuplicateVersion->setEnabled(selected);
+    bool active = selected && ((m_worlds && index.data(Qt::UserRole).toString() == m_activePath)
+        || std::any_of(m_remoteClients.cbegin(), m_remoteClients.cend(), [&](const QPointer<QProcess> &client) {
+            return client && client->state() != QProcess::NotRunning
+                && client->property("instancePath").toString() == index.data(Qt::UserRole).toString();
+        }));
+    ui->actionDeleteVersion->setEnabled(selected && !active);
+    ui->actionDeleteVersion->setText(active ? "Delete... (switch to another version first)" : "Delete...");
+    const QString version = index.data(VersionRole).toString();
+    ui->instanceNameLabel->setText(selected ? index.data(NameRole).toString() : "No version selected");
+    const QString unity = index.data(UnityRole).toString();
+    ui->instanceVersionLabel->setText(selected && !unity.isEmpty() ? "Unity " + unity : QString());
+    ui->actionLaunch->setEnabled(ui->mainTabs->currentWidget() == ui->versionsTab ? selected : ui->versionCombo->currentIndex() >= 0);
+}
+
+void MainWindow::updatePlayPage() {
+    bool installed = ui->versionCombo->currentIndex() >= 0;
+    ui->welcomeTitle->setText(installed ? "Ready to play?" : "Let's get started");
+    ui->welcomeDescription->setText(installed ? "Open your worlds to play, build or create something new." : "Add a game version, then choose a world to play or build.");
+    ui->openWorldsButton->setVisible(installed);
+    ui->firstVersionButton->setVisible(!installed);
+    m_servers->setCanJoin(installed);
+}
+
+void MainWindow::onVersionChanged() {
+    const QString path = ui->versionCombo->currentData().toString();
+    if (path.isEmpty()) return;
+    if (hasRemoteGames() && path != Settings::lastInstance()) {
+        QMessageBox::information(this, "Change version", "Close the game before changing its version.");
+        QSignalBlocker blocker(ui->versionCombo);
+        ui->versionCombo->setCurrentIndex(ui->versionCombo->findData(Settings::lastInstance()));
+        return;
+    }
+    if (m_worlds && path != m_activePath && !launchInstance(path)) {
+        QSignalBlocker blocker(ui->versionCombo);
+        ui->versionCombo->setCurrentIndex(ui->versionCombo->findData(m_activePath));
+        return;
+    }
+    Settings::setLastInstance(path);
+    updatePlayPage();
 }
 
 MainWindow::~MainWindow()
 {
+    if (m_worlds) m_worlds->reject();
     delete ui;
 }
 
 void MainWindow::onInstallTriggered() {
+    if (m_installing) return;
+    m_installing = true;
+    ui->actionInstall->setEnabled(false);
+    ui->addVersionButton->setEnabled(false);
+    ui->firstVersionButton->setEnabled(false);
     if (m_versionsJson.isEmpty()) {
-        ui->actionInstall->setEnabled(false);
         fetchVersions([this]() {
+            m_installing = false;
             ui->actionInstall->setEnabled(true);
+            ui->addVersionButton->setEnabled(true);
+            ui->firstVersionButton->setEnabled(true);
             if (m_versionsJson.isEmpty())
-                QMessageBox::warning(this, "Error", "Could not load the version list:\n" + m_versionsError);
+                QMessageBox::warning(this, "Add version", "Could not load the version list. Check your internet connection and try again.\n" + m_versionsError);
             else
                 onInstallTriggered();
         });
         return;
     }
-
     InstallDialog dialog(m_versionsJson, this);
-    if (dialog.exec() != QDialog::Accepted) return;
-
-    InstallProgressDialog progress(dialog.selectedVersion(), dialog.instanceName(), this);
-    if (progress.exec() == QDialog::Accepted)
-        loadInstances();
+    if (dialog.exec() == QDialog::Accepted) {
+        InstallProgressDialog progress(dialog.selectedVersion(), dialog.instanceName(), this);
+        if (progress.exec() == QDialog::Accepted) {
+            loadInstances(progress.installedPath());
+            ui->mainTabs->setCurrentWidget(ui->playTab);
+            onLaunchTriggered();
+        }
+    }
+    m_installing = false;
+    ui->actionInstall->setEnabled(true);
+    ui->addVersionButton->setEnabled(true);
+    ui->firstVersionButton->setEnabled(true);
 }
 
 void MainWindow::onDiscordTriggered() {
@@ -236,27 +333,23 @@ void MainWindow::onDiscordTriggered() {
 }
 
 void MainWindow::onLaunchTriggered() {
-    QModelIndex index = ui->instancesView->currentIndex();
-    if (!index.isValid()) {
-        QMessageBox::information(this, "Launch", "Select an instance first");
-        return;
-    }
-    if (index.data(Qt::UserRole).toString() == "action_add_instance") {
-        onInstallTriggered();
-    } else {
-        launchInstance(index.data(Qt::UserRole).toString());
+    const QString path = ui->mainTabs->currentWidget() == ui->versionsTab
+        ? ui->instancesView->currentIndex().data(Qt::UserRole).toString()
+        : ui->versionCombo->currentData().toString();
+    if (path.isEmpty()) return;
+    if (launchInstance(path)) {
+        ui->mainTabs->setCurrentWidget(ui->playTab);
+    } else if (m_worlds) {
+        QSignalBlocker blocker(ui->versionCombo);
+        ui->versionCombo->setCurrentIndex(ui->versionCombo->findData(m_activePath));
     }
 }
 
 void MainWindow::showInstanceMenu(const QPoint &pos) {
     QModelIndex index = ui->instancesView->indexAt(pos);
 
-    if (index.isValid() && index.data(Qt::UserRole).toString() == "action_add_instance") {
-        return;
-    }
-
     if (!index.isValid()) {
-        ui->instancesView->clearSelection();
+        ui->instancesView->setCurrentIndex({});
         QMenu menu(this);
         menu.addAction(ui->actionInstall);
         menu.exec(ui->instancesView->viewport()->mapToGlobal(pos));
@@ -265,7 +358,7 @@ void MainWindow::showInstanceMenu(const QPoint &pos) {
     ui->instancesView->setCurrentIndex(index);
 
     QMenu menu(this);
-    QAction *launch = menu.addAction(QIcon(":/launch.png"), "Launch");
+    QAction *launch = menu.addAction("Open worlds");
     menu.addSeparator();
     QAction *rename = menu.addAction("Rename");
     QAction *duplicate = menu.addAction("Duplicate");
@@ -284,10 +377,8 @@ void MainWindow::showInstanceMenu(const QPoint &pos) {
 
 void MainWindow::renameInstance() {
     QModelIndex index = ui->instancesView->currentIndex();
-    if (index.isValid() && index.data(Qt::UserRole).toString() == "action_add_instance") return;
-
-    if (index.isValid())
-        ui->instancesView->edit(index);
+    if (!index.isValid()) return;
+    ui->instancesView->edit(index);
 }
 
 void MainWindow::onInstanceRenamed(QStandardItem *item) {
@@ -305,11 +396,18 @@ void MainWindow::onInstanceRenamed(QStandardItem *item) {
         return;
     }
     item->setData(name, NameRole);
+    int row = ui->versionCombo->findData(item->data(Qt::UserRole));
+    if (row >= 0) {
+        QSignalBlocker blocker(ui->versionCombo);
+        const QString version = item->data(VersionRole).toString();
+        ui->versionCombo->setItemText(row, versionTitle(name, version));
+    }
+    updateInstanceActions();
 }
 
 void MainWindow::duplicateInstance() {
     QModelIndex index = ui->instancesView->currentIndex();
-    if (!index.isValid() || index.data(Qt::UserRole).toString() == "action_add_instance") return;
+    if (!index.isValid()) return;
 
     QString source = index.data(Qt::UserRole).toString();
     QString name = index.data(NameRole).toString() + " (copy)";
@@ -334,15 +432,25 @@ void MainWindow::duplicateInstance() {
             return;
         }
         loadInstances();
+        const auto copied = instances->match(instances->index(0, 0), Qt::UserRole, dest, 1, Qt::MatchExactly);
+        if (!copied.isEmpty()) ui->instancesView->setCurrentIndex(copied.first());
     });
     watcher->setFuture(QtConcurrent::run([source, dest]() { return copyInstance(source, dest); }));
 }
 
 void MainWindow::deleteInstance() {
     QModelIndex index = ui->instancesView->currentIndex();
-    if (!index.isValid() || index.data(Qt::UserRole).toString() == "action_add_instance") return;
+    if (!index.isValid()) return;
 
-    auto answer = QMessageBox::question(this, "Delete Instance",
+    if ((m_worlds && index.data(Qt::UserRole).toString() == m_activePath)
+        || std::any_of(m_remoteClients.cbegin(), m_remoteClients.cend(), [&](const QPointer<QProcess> &client) {
+            return client && client->state() != QProcess::NotRunning
+                && client->property("instancePath").toString() == index.data(Qt::UserRole).toString();
+        })) {
+        QMessageBox::information(this, "Delete version", "Switch to another game version before deleting this one's files.");
+        return;
+    }
+    auto answer = QMessageBox::question(this, "Delete version",
                                         "Delete \"" + index.data().toString() + "\" and all its files? This can't be undone.",
                                         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (answer != QMessageBox::Yes) return;
@@ -354,22 +462,22 @@ void MainWindow::deleteInstance() {
     loadInstances();
 }
 
-void MainWindow::launchInstance(const QString &path) {
+bool MainWindow::prepareInstance(const QString &path, QString *executable) {
     QDir dir(path);
     QString exe = dir.entryList({"*.unityweb", "*.unity3d"}, QDir::Files).value(0);
 
     if (!exe.isEmpty()) {
         if (!QFile::exists(WebPlayerRuntime::playerPath())) {
             QMessageBox::warning(this, "Launch", "OpenKogama Player is missing from " + QDir::toNativeSeparators(WebPlayerRuntime::playerPath()));
-            return;
+            return false;
         }
         if (!WebPlayerRuntime::ensureInstalled(this))
-            return;
+            return false;
     } else {
         QString data = dir.entryList({"*_Data"}, QDir::Dirs).value(0);
         if (data.isEmpty()) {
             QMessageBox::warning(this, "Launch", "This version can't be launched yet");
-            return;
+            return false;
         }
 
         exe = data.chopped(5) + ".exe";
@@ -377,29 +485,83 @@ void MainWindow::launchInstance(const QString &path) {
             QString other = dir.entryList({"*.exe"}, QDir::Files).value(0);
             if (other.isEmpty() || !dir.rename(other, exe)) {
                 QMessageBox::warning(this, "Launch", "No game executable in " + path);
-                return;
+                return false;
             }
         }
     }
 
-    LaunchDialog launch(AssetInstaller::versionOf(path), this);
-    if (launch.exec() != QDialog::Accepted) return;
-
-    auto *worlds = new WorldsDialog(path, exe, launch.server(), this);
-    worlds->setAttribute(Qt::WA_DeleteOnClose);
-    worlds->setModal(false);
-    worlds->show();
+    *executable = exe;
+    return true;
 }
 
-bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
-    if (watched == ui->instancesView->viewport() && event->type() == QEvent::MouseMove) {
-        QPoint pos = ui->instancesView->viewport()->mapFromGlobal(QCursor::pos());
-        QModelIndex index = ui->instancesView->indexAt(pos);
-        if (index.isValid()) {
-            ui->instancesView->viewport()->setCursor(Qt::PointingHandCursor);
-        } else {
-            ui->instancesView->viewport()->setCursor(Qt::ArrowCursor);
-        }
+bool MainWindow::launchInstance(const QString &path) {
+    if (m_worlds && path == m_activePath) {
+        ui->mainTabs->setCurrentWidget(ui->playTab);
+        return true;
     }
-    return QMainWindow::eventFilter(watched, event);
+    if ((m_worlds && m_worlds->hasRunningGames()) || hasRemoteGames()) {
+        QMessageBox::information(this, "Change version", "Close the game before changing its version.");
+        return false;
+    }
+    QString exe;
+    if (!prepareInstance(path, &exe)) return false;
+    const QString version = AssetInstaller::versionOf(path);
+    QProcess *server = nullptr;
+    if ((!m_localReady || !m_checkedVersions.contains(version)) && !startLocalServer(version, &server))
+        return false;
+
+    if (!m_worlds) {
+        m_worlds = new WorldsDialog(path, exe, server, this);
+        m_worlds->setWindowFlags(Qt::Widget);
+        m_worlds->hide();
+        ui->worldsLayout->addWidget(m_worlds->worldsPage());
+        ui->avatarsLayout->addWidget(m_worlds->avatarsPage());
+        m_worlds->worldsPage()->show();
+        m_worlds->avatarsPage()->show();
+        ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), true);
+    } else {
+        m_worlds->setInstance(path, exe, server);
+    }
+    m_activePath = path;
+    Settings::setLastInstance(path);
+    {
+        QSignalBlocker blocker(ui->versionCombo);
+        ui->versionCombo->setCurrentIndex(ui->versionCombo->findData(path));
+    }
+    ui->playStack->setCurrentWidget(ui->worldsPage);
+    updateInstanceActions();
+    updatePlayPage();
+    return true;
+}
+
+bool MainWindow::startLocalServer(const QString &version, QProcess **server) {
+    LaunchDialog launch(version, this);
+    if (launch.exec() != QDialog::Accepted) return false;
+    *server = launch.server();
+    m_checkedVersions.insert(version);
+    m_localReady = true;
+    return true;
+}
+
+bool MainWindow::hasRemoteGames() const {
+    return std::any_of(m_remoteClients.cbegin(), m_remoteClients.cend(), [](const QPointer<QProcess> &client) {
+        return client && client->state() != QProcess::NotRunning;
+    });
+}
+
+void MainWindow::joinServer(const QString &address) {
+    const QString path = ui->versionCombo->currentData().toString();
+    if (path.isEmpty()) return;
+    QString exe;
+    if (!prepareInstance(path, &exe)) return;
+    QProcess *client = GameLauncher::start(path, exe, address, "play", 0, this, this);
+    if (!client) return;
+    client->setProperty("instancePath", path);
+    m_remoteClients.append(client);
+    connect(client, &QProcess::finished, this, [this, client]() {
+        m_remoteClients.removeAll(client);
+        updateInstanceActions();
+    });
+    Settings::setLastInstance(path);
+    updateInstanceActions();
 }

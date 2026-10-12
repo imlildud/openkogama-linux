@@ -7,7 +7,7 @@
 
 class AssetInstaller;
 
-inline const QString ServerUrl = "http://127.0.0.1:8080";
+inline const QString LocalServerUrl = "http://127.0.0.1:8080";
 
 namespace Ui {
 class LaunchDialog;
