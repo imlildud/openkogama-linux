@@ -276,16 +276,92 @@
          <number>12</number>
         </property>
         <item>
-         <widget class="QLabel" name="noVersionsLabel">
-          <property name="text">
-           <string>No versions installed yet. Click Add version to get started.</string>
-          </property>
-          <property name="wordWrap">
-           <bool>true</bool>
-          </property>
-          <property name="textFormat">
-           <enum>Qt::PlainText</enum>
-          </property>
+         <widget class="QWidget" name="noVersionsPage">
+          <layout class="QVBoxLayout" name="noVersionsLayout">
+           <property name="spacing">
+            <number>12</number>
+           </property>
+           <item>
+            <spacer name="noVersionsTopSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+           <item>
+            <widget class="QLabel" name="noVersionsTitle">
+             <property name="text">
+              <string>No versions yet</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+             <property name="textFormat">
+              <enum>Qt::PlainText</enum>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>18</pointsize>
+               <bold>true</bold>
+              </font>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QLabel" name="noVersionsDescription">
+             <property name="text">
+              <string>Add a game version to download it and start playing.</string>
+             </property>
+             <property name="wordWrap">
+              <bool>true</bool>
+             </property>
+             <property name="textFormat">
+              <enum>Qt::PlainText</enum>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item alignment="Qt::AlignHCenter">
+            <widget class="QPushButton" name="noVersionsButton">
+             <property name="primary" stdset="0">
+              <bool>true</bool>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>240</width>
+               <height>36</height>
+              </size>
+             </property>
+             <property name="text">
+              <string>Add version...</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <spacer name="noVersionsBottomSpacer">
+             <property name="orientation">
+              <enum>Qt::Vertical</enum>
+             </property>
+             <property name="sizeHint">
+              <size>
+               <width>20</width>
+               <height>40</height>
+              </size>
+             </property>
+            </spacer>
+           </item>
+          </layout>
          </widget>
         </item>
         <item>

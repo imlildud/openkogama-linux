@@ -19,7 +19,7 @@ QPushButton[primary="true"]:disabled { background: #2a2a2a; color: #6e6e6e; bord
 
 QPushButton#playButton, QPushButton#buildButton, QPushButton#useAvatarButton,
 QPushButton#editAvatarButton, QPushButton#useVersionButton, QPushButton#joinServerButton { font-size: 11pt; min-height: 34px; }
-QPushButton#openWorldsButton, QPushButton#firstVersionButton { min-height: 34px; }
+QPushButton#openWorldsButton, QPushButton#firstVersionButton, QPushButton#noVersionsButton { min-height: 34px; }
 
 QToolButton {
     background: transparent;

@@ -125,6 +125,7 @@ MainWindow::MainWindow(QWidget *parent)
     versionMenu->addAction(ui->actionDeleteVersion);
     ui->moreVersionButton->setMenu(versionMenu);
     connect(ui->firstVersionButton, &QPushButton::clicked, this, &MainWindow::onInstallTriggered);
+    connect(ui->noVersionsButton, &QPushButton::clicked, this, &MainWindow::onInstallTriggered);
     connect(ui->openWorldsButton, &QPushButton::clicked, this, &MainWindow::onLaunchTriggered);
     connect(ui->useVersionButton, &QPushButton::clicked, this, &MainWindow::onLaunchTriggered);
     connect(ui->actionRenameVersion, &QAction::triggered, this, &MainWindow::renameInstance);
@@ -231,7 +232,7 @@ void MainWindow::loadInstances(const QString &selectPath) {
         Settings::setLastInstance(ui->versionCombo->currentData().toString());
     }
     ui->versionCombo->setEnabled(selected >= 0);
-    ui->noVersionsLabel->setVisible(selected < 0);
+    ui->noVersionsPage->setVisible(selected < 0);
     ui->instancesView->setVisible(selected >= 0);
     ui->selectedVersionGroup->setVisible(selected >= 0);
     updateInstanceActions();
@@ -298,12 +299,14 @@ void MainWindow::onInstallTriggered() {
     ui->actionInstall->setEnabled(false);
     ui->addVersionButton->setEnabled(false);
     ui->firstVersionButton->setEnabled(false);
+    ui->noVersionsButton->setEnabled(false);
     if (m_versionsJson.isEmpty()) {
         fetchVersions([this]() {
             m_installing = false;
             ui->actionInstall->setEnabled(true);
             ui->addVersionButton->setEnabled(true);
             ui->firstVersionButton->setEnabled(true);
+            ui->noVersionsButton->setEnabled(true);
             if (m_versionsJson.isEmpty())
                 QMessageBox::warning(this, "Add version", "Could not load the version list. Check your internet connection and try again.\n" + m_versionsError);
             else
@@ -324,6 +327,7 @@ void MainWindow::onInstallTriggered() {
     ui->actionInstall->setEnabled(true);
     ui->addVersionButton->setEnabled(true);
     ui->firstVersionButton->setEnabled(true);
+    ui->noVersionsButton->setEnabled(true);
 }
 
 void MainWindow::onDiscordTriggered() {
