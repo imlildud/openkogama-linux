@@ -404,8 +404,7 @@ void WorldsDialog::importWorld() {
     QUrlQuery query;
     query.addQueryItem("name", QFileInfo(path).completeBaseName());
     QFile meta(QDir(m_path).filePath("instance.json"));
-    meta.open(QIODevice::ReadOnly);
-    QString version = QJsonDocument::fromJson(meta.readAll()).object().value("version").toString();
+    QString version = meta.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(meta.readAll()).object().value("version").toString() : QString();
     if (!version.isEmpty())
         query.addQueryItem("client", version);
     url.setQuery(query);

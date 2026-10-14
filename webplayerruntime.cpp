@@ -1,6 +1,5 @@
 #include "webplayerruntime.h"
 #include <QBuffer>
-#include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDir>
 #include <QEventLoop>
@@ -12,7 +11,6 @@
 #include <QProgressDialog>
 #include <QSet>
 #include <QSettings>
-#include <QStandardPaths>
 #include <QtCore/private/qzipreader_p.h>
 
 namespace {
@@ -42,17 +40,6 @@ void registerRuntime() {
 
 bool WebPlayerRuntime::isWebPlayerFile(const QString &name) {
     return name.endsWith(".unityweb", Qt::CaseInsensitive) || name.endsWith(".unity3d", Qt::CaseInsensitive);
-}
-
-QString WebPlayerRuntime::bundledDir(const QString &name) {
-    QString bundled = QCoreApplication::applicationDirPath() + "/" + name;
-    if (QDir(bundled).exists())
-        return bundled;
-    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/" + name;
-}
-
-QString WebPlayerRuntime::playerPath() {
-    return bundledDir("player") + "/openkogama-player.exe";
 }
 
 bool WebPlayerRuntime::ensureInstalled(QWidget *parent) {

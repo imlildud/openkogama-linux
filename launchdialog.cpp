@@ -1,12 +1,11 @@
 #include "launchdialog.h"
 #include "assetinstaller.h"
-#include "webplayerruntime.h"
+#include "paths.h"
 #include "ui_launchdialog.h"
 #include <QDialogButtonBox>
 #include <QDir>
 #include <QIcon>
 #include <QNetworkReply>
-#include <QStandardPaths>
 #include <QTimer>
 
 static constexpr unsigned long CreateNoWindow = 0x08000000;
@@ -73,16 +72,17 @@ void LaunchDialog::reject() {
 }
 
 void LaunchDialog::startServer() {
-    QDir dir(WebPlayerRuntime::bundledDir("server"));
+    QDir dir(Paths::server());
     if (!dir.exists("openkogama-server.exe")) {
         fail("Server not found in " + dir.path());
         return;
     }
 
     setStep("Starting server...", AssetsEnd + 5);
+    QDir().mkpath(Paths::serverData());
     m_server = new QProcess(parentWidget());
     m_server->setProgram(dir.filePath("openkogama-server.exe"));
-    m_server->setWorkingDirectory(dir.path());
+    m_server->setWorkingDirectory(Paths::serverData());
     if (m_offline) m_server->setArguments({"--offline"});
     m_server->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;

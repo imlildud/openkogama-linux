@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "updater.h"
 
 #include <QApplication>
 #include <QFile>
@@ -7,6 +8,7 @@
 
 int main(int argc, char *argv[])
 {
+    Updater::startup();
     QApplication a(argc, argv);
     a.setStyle("Fusion");
     a.styleHints()->setColorScheme(Qt::ColorScheme::Dark);
@@ -22,5 +24,6 @@ int main(int argc, char *argv[])
     a.setApplicationName("OpenKogama Launcher");
     MainWindow w;
     w.show();
+    Updater::check(&w);
     return QApplication::exec();
 }

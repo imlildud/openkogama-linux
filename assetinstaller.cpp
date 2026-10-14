@@ -1,5 +1,5 @@
 #include "assetinstaller.h"
-#include "webplayerruntime.h"
+#include "paths.h"
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
@@ -22,16 +22,17 @@ QString AssetInstaller::versionOf(const QString &instancePath) {
 }
 
 void AssetInstaller::start(const QString &version) {
-    QDir dir(WebPlayerRuntime::bundledDir("server"));
+    QDir dir(Paths::server());
     if (version.isEmpty() || !dir.exists("openkogama-server.exe")) {
         emit finished(false);
         return;
     }
 
+    QDir().mkpath(Paths::serverData());
     m_process = new QProcess(this);
     m_process->setProgram(dir.filePath("openkogama-server.exe"));
     m_process->setArguments({"install", version});
-    m_process->setWorkingDirectory(dir.path());
+    m_process->setWorkingDirectory(Paths::serverData());
     m_process->setProcessChannelMode(QProcess::MergedChannels);
     m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;

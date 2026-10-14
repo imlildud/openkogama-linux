@@ -17,6 +17,9 @@ permissions:
 jobs:
   windows:
     runs-on: windows-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      REPO_URL: ${{ github.server_url }}/${{ github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -69,22 +72,27 @@ jobs:
 
       - name: package
         shell: pwsh
-        run: |
-          Copy-Item openkogama-launcher/LICENSE.txt dist/
-          $name = "openkogama-${{ inputs.tag }}-windows.zip"
-          Compress-Archive -Path dist/* -DestinationPath $name
-          Get-ChildItem dist | Format-Table Name, Length
-          "ZIP=$name" >> $env:GITHUB_ENV
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: ${{ env.ZIP }}
-      - name: release
-        if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
         run: |
-          $flags = @("--generate-notes")
-          if ("${{ inputs.tag }}" -match "-") { $flags += "--prerelease" }
-          gh release create "${{ inputs.tag }}" $env:ZIP -R ${{ github.repository }} --target ${{ github.sha }} --title "${{ inputs.tag }}" @flags
+          Copy-Item openkogama-launcher/LICENSE.txt dist/
+          dotnet tool install -g vpk --version 1.2.161
+          $version = $env:TAG.TrimStart("v")
+          $pre = @()
+          if ($version -match "-") { $pre = @("--pre") }
+          vpk download github --repoUrl $env:REPO_URL --token $env:GH_TOKEN -o releases @pre
+          vpk pack --packId OpenKogamaLauncher --packVersion $version --packDir dist --mainExe openkogama-launcher.exe --packTitle "OpenKogama Launcher" --packAuthors OpenKogama --icon openkogama-launcher/openkogama.ico -o releases
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: releases
+          path: releases
+      - name: release
+        if: inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $pre = @()
+          if ($env:TAG -match "-") { $pre = @("--pre") }
+          vpk upload github --repoUrl $env:REPO_URL --token $env:GH_TOKEN -o releases --publish --releaseName $env:TAG --tag $env:TAG --targetCommitish $env:GITHUB_SHA @pre

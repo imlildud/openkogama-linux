@@ -1,14 +1,14 @@
 #include "settings.h"
+#include "paths.h"
 
 #include <QSettings>
-#include <QStandardPaths>
 #include <QUrl>
 
 namespace {
 
 QSettings store()
 {
-    return QSettings(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/settings.ini", QSettings::IniFormat);
+    return QSettings(Paths::data() + "/settings.ini", QSettings::IniFormat);
 }
 
 }

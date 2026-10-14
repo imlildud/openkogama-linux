@@ -10,10 +10,10 @@
 #include "gamelauncher.h"
 #include "settings.h"
 #include "creditsdialog.h"
+#include "paths.h"
 #include "webplayerruntime.h"
 #include <QApplication>
 #include <QDesktopServices>
-#include <QStandardPaths>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -64,10 +64,6 @@ static QIcon instanceIcon(const QDir &dir, const QFileIconProvider &provider) {
     if (pixmap.isNull()) return QIcon(":/unknown.png");
     pixmap.save(cached);
     return QIcon(pixmap);
-}
-
-static QString instancesBase() {
-    return QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/instances";
 }
 
 static bool saveInstanceName(const QString &path, const QString &name) {
@@ -200,7 +196,7 @@ void MainWindow::loadInstances(const QString &selectPath) {
     QSignalBlocker comboBlocker(ui->versionCombo);
     instances->clear();
     ui->versionCombo->clear();
-    QDir dir(instancesBase());
+    QDir dir(Paths::instances());
     QFileIconProvider iconProvider;
     QList<QPair<QString, QJsonObject>> found;
     for (const QString &folder : dir.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
@@ -414,9 +410,9 @@ void MainWindow::duplicateInstance() {
     QString source = index.data(Qt::UserRole).toString();
     QString name = index.data(NameRole).toString() + " (copy)";
     QString folder = QFileInfo(source).fileName() + " (copy)";
-    QString dest = instancesBase() + "/" + folder;
+    QString dest = Paths::instances() + "/" + folder;
     for (int n = 2; QDir(dest).exists(); n++)
-        dest = instancesBase() + "/" + folder + " (" + QString::number(n) + ")";
+        dest = Paths::instances() + "/" + folder + " (" + QString::number(n) + ")";
 
     auto *progress = new QProgressDialog("Duplicating " + index.data(NameRole).toString() + "...", QString(), 0, 0, this);
     progress->setWindowTitle("Duplicate Instance");
@@ -458,7 +454,7 @@ void MainWindow::deleteInstance() {
     if (answer != QMessageBox::Yes) return;
 
     QDir dir(index.data(Qt::UserRole).toString());
-    if (QDir::cleanPath(dir.absolutePath()).startsWith(QDir::cleanPath(instancesBase()) + "/") && !dir.removeRecursively())
+    if (QDir::cleanPath(dir.absolutePath()).startsWith(QDir::cleanPath(Paths::instances()) + "/") && !dir.removeRecursively())
         QMessageBox::warning(this, "Delete Instance", "Some files could not be deleted. Close the game if it is running and try again.");
 
     loadInstances();
@@ -469,8 +465,8 @@ bool MainWindow::prepareInstance(const QString &path, QString *executable) {
     QString exe = dir.entryList({"*.unityweb", "*.unity3d"}, QDir::Files).value(0);
 
     if (!exe.isEmpty()) {
-        if (!QFile::exists(WebPlayerRuntime::playerPath())) {
-            QMessageBox::warning(this, "Launch", "OpenKogama Player is missing from " + QDir::toNativeSeparators(WebPlayerRuntime::playerPath()));
+        if (!QFile::exists(Paths::player())) {
+            QMessageBox::warning(this, "Launch", "OpenKogama Player is missing from " + QDir::toNativeSeparators(Paths::player()));
             return false;
         }
         if (!WebPlayerRuntime::ensureInstalled(this))

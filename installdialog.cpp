@@ -1,6 +1,6 @@
 #include "installdialog.h"
 #include "ui_installdialog.h"
-#include "webplayerruntime.h"
+#include "paths.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -56,9 +56,8 @@ void InstallDialog::populate(const QByteArray &data) {
 
         const auto array = document.object().value("versions").toArray();
 
-        QFile file(WebPlayerRuntime::bundledDir("server") + "/data/support.json");
-        file.open(QIODevice::ReadOnly);
-        const QJsonObject support = QJsonDocument::fromJson(file.readAll()).object();
+        QFile file(Paths::server() + "/data/support.json");
+        const QJsonObject support = file.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(file.readAll()).object() : QJsonObject();
 
         for (const auto& entry : array) {
             auto object = entry.toObject();

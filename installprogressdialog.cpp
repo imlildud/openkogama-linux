@@ -1,6 +1,7 @@
 #include "installprogressdialog.h"
 #include "ui_installprogressdialog.h"
 #include "assetinstaller.h"
+#include "paths.h"
 #include <QIcon>
 #include <QDir>
 #include <QStandardPaths>
@@ -119,7 +120,7 @@ void InstallProgressDialog::onFinished() {
 }
 
 void InstallProgressDialog::extract() {
-    QString base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/instances/";
+    QString base = Paths::instances() + "/";
     QString folder = sanitize(m_name);
     m_dest = uniqueDir(base, folder.isEmpty() ? "KoGaMa" : folder);
     QDir().mkpath(m_dest);

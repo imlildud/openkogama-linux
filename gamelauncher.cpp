@@ -1,5 +1,6 @@
 #include "gamelauncher.h"
 #include "launchdialog.h"
+#include "paths.h"
 #include "webplayerruntime.h"
 #include "consolewindow.h"
 #include "settings.h"
@@ -48,7 +49,7 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         if (meta.open(QIODevice::ReadOnly)) info = QJsonDocument::fromJson(meta.readAll()).object();
         QString version = info.value("version").toString();
         QString file = QDir::toNativeSeparators(QDir(path).filePath(exe));
-        client->setProgram(WebPlayerRuntime::playerPath());
+        client->setProgram(Paths::player());
         if (info.value("unityVersion").toString().startsWith("3.4")) {
             if (mode == "avatar") {
                 client->deleteLater();
@@ -85,7 +86,7 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
     if (WebPlayerRuntime::isWebPlayerFile(exe))
         console->followNewest("Unity", QDir::tempPath() + "/UnityWebPlayer/log");
     if (local)
-        console->followNewest("Server", WebPlayerRuntime::bundledDir("server") + "/logs", true);
+        console->followNewest("Server", Paths::serverData() + "/logs", true);
     QObject::connect(console, &ConsoleWindow::crashed, console, [console]() {
         if (!Settings::consoleOnCrash())
             return;
