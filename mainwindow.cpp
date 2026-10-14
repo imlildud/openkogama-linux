@@ -113,6 +113,8 @@ MainWindow::MainWindow(QWidget *parent)
     m_servers = new ServersPage(this);
     ui->mainTabs->insertTab(1, m_servers, "&Servers");
     connect(m_servers, &ServersPage::joinRequested, this, &MainWindow::joinServer);
+    ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(m_servers), false);
+    ui->mainTabs->setTabVisible(ui->mainTabs->indexOf(m_servers), false);
     ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
     connect(ui->actionInstall, &QAction::triggered, this, &MainWindow::onInstallTriggered);
     connect(ui->actionDiscord, &QAction::triggered, this, &MainWindow::onDiscordTriggered);
