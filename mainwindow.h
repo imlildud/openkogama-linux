@@ -35,6 +35,7 @@ private slots:
     void renameInstance();
     void onInstanceRenamed(QStandardItem *item);
     void duplicateInstance();
+    void showInstanceFolder();
     void deleteInstance();
 
 private:

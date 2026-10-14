@@ -132,6 +132,7 @@ MainWindow::MainWindow(QWidget *parent)
     auto *versionMenu = new QMenu(this);
     versionMenu->addAction(ui->actionRenameVersion);
     versionMenu->addAction(ui->actionDuplicateVersion);
+    versionMenu->addAction(ui->actionShowVersionFolder);
     versionMenu->addSeparator();
     versionMenu->addAction(ui->actionDeleteVersion);
     ui->moreVersionButton->setMenu(versionMenu);
@@ -141,6 +142,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->useVersionButton, &QPushButton::clicked, this, &MainWindow::onLaunchTriggered);
     connect(ui->actionRenameVersion, &QAction::triggered, this, &MainWindow::renameInstance);
     connect(ui->actionDuplicateVersion, &QAction::triggered, this, &MainWindow::duplicateInstance);
+    connect(ui->actionShowVersionFolder, &QAction::triggered, this, &MainWindow::showInstanceFolder);
     connect(ui->actionDeleteVersion, &QAction::triggered, this, &MainWindow::deleteInstance);
 
     instances = new QStandardItemModel(this);
@@ -258,6 +260,7 @@ void MainWindow::updateInstanceActions() {
     ui->moreVersionButton->setEnabled(selected);
     ui->actionRenameVersion->setEnabled(selected);
     ui->actionDuplicateVersion->setEnabled(selected);
+    ui->actionShowVersionFolder->setEnabled(selected);
     bool active = selected && ((m_worlds && index.data(Qt::UserRole).toString() == m_activePath)
         || std::any_of(m_remoteClients.cbegin(), m_remoteClients.cend(), [&](const QPointer<QProcess> &client) {
             return client && client->state() != QProcess::NotRunning
@@ -376,6 +379,7 @@ void MainWindow::showInstanceMenu(const QPoint &pos) {
     menu.addSeparator();
     QAction *rename = menu.addAction("Rename");
     QAction *duplicate = menu.addAction("Duplicate");
+    QAction *folder = menu.addAction("Show in Explorer");
     QAction *remove = menu.addAction("Delete");
 
     QAction *chosen = menu.exec(ui->instancesView->viewport()->mapToGlobal(pos));
@@ -385,6 +389,8 @@ void MainWindow::showInstanceMenu(const QPoint &pos) {
         renameInstance();
     else if (chosen == duplicate)
         duplicateInstance();
+    else if (chosen == folder)
+        showInstanceFolder();
     else if (chosen == remove)
         deleteInstance();
 }
@@ -417,6 +423,12 @@ void MainWindow::onInstanceRenamed(QStandardItem *item) {
         ui->versionCombo->setItemText(row, versionTitle(name, version));
     }
     updateInstanceActions();
+}
+
+void MainWindow::showInstanceFolder() {
+    QModelIndex index = ui->instancesView->currentIndex();
+    if (!index.isValid()) return;
+    QDesktopServices::openUrl(QUrl::fromLocalFile(index.data(Qt::UserRole).toString()));
 }
 
 void MainWindow::duplicateInstance() {

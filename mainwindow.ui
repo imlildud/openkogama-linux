@@ -547,6 +547,11 @@
     <string>Make a copy</string>
    </property>
   </action>
+  <action name="actionShowVersionFolder">
+   <property name="text">
+    <string>Show in Explorer</string>
+   </property>
+  </action>
   <action name="actionDeleteVersion">
    <property name="text">
     <string>Delete...</string>
