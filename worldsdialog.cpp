@@ -18,7 +18,10 @@
 static constexpr int NameRole = Qt::UserRole + 1;
 static constexpr int ImageRole = Qt::UserRole + 2;
 static constexpr int ActiveRole = Qt::UserRole + 3;
+static const QUrl MapsArchive("https://cdn.openkogama.org/maps/v1/");
 
+#include <QBuffer>
+#include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QStandardPaths>
@@ -27,6 +30,7 @@ static constexpr int ActiveRole = Qt::UserRole + 3;
 #include <QFileInfo>
 #include <QFont>
 #include <QIcon>
+#include <QImage>
 #include <QComboBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
@@ -411,12 +415,50 @@ void WorldsDialog::importWorld() {
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
-    QNetworkReply *reply = m_net->post(request, file.readAll());
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    const QByteArray data = file.readAll();
+    QNetworkReply *reply = m_net->post(request, data);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, data]() {
         reply->deleteLater();
         int id = QJsonDocument::fromJson(reply->readAll()).object()["id"].toInt();
         if (id == 0) QMessageBox::warning(this, "Import", "This map could not be imported");
+        else findArchiveThumbnail(id, data);
         loadWorlds(id);
+    });
+}
+
+void WorldsDialog::findArchiveThumbnail(int world, const QByteArray &file) {
+    const QString sha = QCryptographicHash::hash(file, QCryptographicHash::Sha256).toHex();
+    QNetworkReply *reply = m_net->get(QNetworkRequest(MapsArchive.resolved(QUrl("latest.json"))));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, world, sha]() {
+        reply->deleteLater();
+        const QJsonObject latest = QJsonDocument::fromJson(reply->readAll()).object();
+        const QJsonObject hashes = latest["hashes"].toObject();
+        if (reply->error() != QNetworkReply::NoError || hashes.isEmpty()) return;
+        const QUrl build = MapsArchive.resolved(QUrl("builds/" + latest["build"].toString() + "/"));
+        const QUrl images = build.resolved(QUrl(latest["images"].toObject()["path"].toString()));
+        QNetworkReply *lookup = m_net->get(QNetworkRequest(build.resolved(QUrl(hashes["path"].toString() + sha.left(hashes["prefix"].toInt(2)) + ".json"))));
+        connect(lookup, &QNetworkReply::finished, this, [this, lookup, world, sha, images]() {
+            lookup->deleteLater();
+            const QString image = QJsonDocument::fromJson(lookup->readAll()).object()[sha].toArray().at(1).toString();
+            if (lookup->error() == QNetworkReply::NoError && !image.isEmpty())
+                downloadArchiveThumbnail(world, images.resolved(QUrl(image + ".jpg")));
+        });
+    });
+}
+
+void WorldsDialog::downloadArchiveThumbnail(int world, const QUrl &url) {
+    QNetworkReply *reply = m_net->get(QNetworkRequest(url));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, world]() {
+        reply->deleteLater();
+        QImage image;
+        QByteArray png;
+        QBuffer buffer(&png);
+        if (reply->error() != QNetworkReply::NoError || !image.loadFromData(reply->readAll())
+            || !buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG")) return;
+        QNetworkRequest request(QUrl(m_url + "/api/worlds/thumbnail?id=" + QString::number(world)));
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "image/png");
+        QNetworkReply *upload = m_net->post(request, png);
+        connect(upload, &QNetworkReply::finished, upload, &QObject::deleteLater);
     });
 }
 

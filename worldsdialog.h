@@ -41,6 +41,8 @@ private:
     void checkRevision();
     void createWorld();
     void importWorld();
+    void findArchiveThumbnail(int world, const QByteArray &file);
+    void downloadArchiveThumbnail(int world, const QUrl &url);
     void exportWorld();
     void renameWorld();
     void deleteWorld();

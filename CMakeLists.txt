@@ -23,6 +23,7 @@ qt_add_executable(openkogama-launcher
     webplayerruntime.h webplayerruntime.cpp
     paths.h paths.cpp
     updater.h updater.cpp
+    theme.h theme.cpp
     settings.h settings.cpp
     settingsdialog.h settingsdialog.cpp settingsdialog.ui
     consolewindow.h consolewindow.cpp
@@ -45,6 +46,8 @@ qt_add_resources(openkogama-launcher "resources"
     FILES arrow-down.svg
     FILES check.svg
     FILES plus.svg
+    FILES plus-light.svg
+    FILES arrow-down-light.svg
 )
 
 include(FetchContent)
@@ -96,7 +99,7 @@ include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
     qt_add_executable(launcher-tests tests/serverspage_test.cpp serverspage.cpp serverspage.h tilegrid.cpp tilegrid.h settings.cpp settings.h
-        gamelauncher.cpp gamelauncher.h consolewindow.cpp consolewindow.h webplayerruntime.cpp webplayerruntime.h paths.cpp paths.h
+        gamelauncher.cpp gamelauncher.h consolewindow.cpp consolewindow.h webplayerruntime.cpp webplayerruntime.h paths.cpp paths.h theme.cpp theme.h
         launchdialog.cpp launchdialog.h launchdialog.ui assetinstaller.cpp assetinstaller.h)
     target_include_directories(launcher-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(launcher-tests PRIVATE Qt::Widgets Qt::Network Qt::Test Qt::CorePrivate)

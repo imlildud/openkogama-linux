@@ -54,11 +54,7 @@
         </layout>
        </item>
        <item>
-        <widget class="QTreeView" name="versionsTreeView">
-         <property name="styleSheet">
-          <string notr="true">alternate-background-color: rgb(38, 38, 38);</string>
-         </property>
-        </widget>
+        <widget class="QTreeView" name="versionsTreeView"/>
        </item>
        <item>
         <widget class="QLineEdit" name="searchLineEdit">

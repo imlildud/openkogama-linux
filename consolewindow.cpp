@@ -1,4 +1,5 @@
 #include "consolewindow.h"
+#include "theme.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -18,8 +19,15 @@
 
 namespace {
 
-const QColor ErrorColor("#e06c75");
-const QColor WarningColor("#e5c07b");
+QColor errorColor()
+{
+    return Theme::dark() ? QColor("#e06c75") : QColor("#c0392b");
+}
+
+QColor warningColor()
+{
+    return Theme::dark() ? QColor("#e5c07b") : QColor("#9a6700");
+}
 
 bool isCrash(const QString &line)
 {
@@ -29,9 +37,9 @@ bool isCrash(const QString &line)
 QColor colorFor(const QString &line)
 {
     if (isCrash(line) || line.contains("exception", Qt::CaseInsensitive) || line.contains("error", Qt::CaseInsensitive))
-        return ErrorColor;
+        return errorColor();
     if (line.contains("warning", Qt::CaseInsensitive))
-        return WarningColor;
+        return warningColor();
     return {};
 }
 
@@ -157,7 +165,7 @@ void ConsoleWindow::append(int source, const QString &line)
 
 void ConsoleWindow::reportCrash(int source)
 {
-    m_tabs->tabBar()->setTabTextColor(source, ErrorColor);
+    m_tabs->tabBar()->setTabTextColor(source, errorColor());
     if (m_crashed)
         return;
     m_crashed = true;

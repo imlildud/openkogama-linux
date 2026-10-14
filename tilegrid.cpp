@@ -3,6 +3,7 @@
 #include <QListWidget>
 #include <QScrollBar>
 #include <QPainter>
+#include <QPainterPath>
 #include <QStyle>
 #include <algorithm>
 
@@ -47,9 +48,27 @@ QPixmap placeholder(const QSize &size, const QColor &background)
     QPixmap pixmap(size);
     pixmap.fill(background);
     QPainter painter(&pixmap);
-    painter.setOpacity(0.3);
-    QPixmap logo = QPixmap(":/logo.png").scaled(size * 0.6, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    painter.drawPixmap((size.width() - logo.width()) / 2, (size.height() - logo.height()) / 2, logo);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const bool light = background.lightness() > 128;
+    painter.fillRect(pixmap.rect(), QColor(0, 0, 0, light ? 15 : 46));
+    const qreal scale = std::min(size.width(), size.height()) * 0.4 / 24;
+    painter.translate((size.width() - 24 * scale) / 2, (size.height() - 24 * scale) / 2);
+    painter.scale(scale, scale);
+    painter.setPen(QPen(light ? QColor(0, 0, 0, 64) : QColor(255, 255, 255, 77), 1.6, Qt::SolidLine, Qt::FlatCap, Qt::MiterJoin));
+    QPainterPath cube;
+    cube.moveTo(12, 3);
+    cube.lineTo(3, 7.5);
+    cube.lineTo(3, 16.5);
+    cube.lineTo(12, 21);
+    cube.lineTo(21, 16.5);
+    cube.lineTo(21, 7.5);
+    cube.closeSubpath();
+    cube.moveTo(3, 7.5);
+    cube.lineTo(12, 12);
+    cube.lineTo(21, 7.5);
+    cube.moveTo(12, 12);
+    cube.lineTo(12, 21);
+    painter.drawPath(cube);
     return pixmap;
 }
 

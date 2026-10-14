@@ -11,6 +11,7 @@
 #include "settings.h"
 #include "creditsdialog.h"
 #include "paths.h"
+#include "theme.h"
 #include "webplayerruntime.h"
 #include <QApplication>
 #include <QDesktopServices>
@@ -20,7 +21,9 @@
 #include <QFileIconProvider>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QPainter>
 #include <QPixmap>
+#include <QStyleHints>
 #include <QIcon>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -55,13 +58,21 @@ static QString versionTitle(const QString &name, const QString &version) {
     return name == version ? "KoGaMa " + version : name + " (KoGaMa " + version + ")";
 }
 
+static QIcon unknownIcon() {
+    QPixmap pixmap(":/unknown.png");
+    QPainter painter(&pixmap);
+    painter.setCompositionMode(QPainter::CompositionMode_SourceIn);
+    painter.fillRect(pixmap.rect(), Theme::dark() ? QColor(Qt::white) : QColor(0x3c, 0x3c, 0x3c));
+    return QIcon(pixmap);
+}
+
 static QIcon instanceIcon(const QDir &dir, const QFileIconProvider &provider) {
     const QString cached = dir.filePath("icon.png");
     if (QFile::exists(cached)) return QIcon(cached);
     const QString exe = dir.entryList({"*.exe"}, QDir::Files).value(0);
-    if (exe.isEmpty()) return QIcon(":/unknown.png");
+    if (exe.isEmpty()) return unknownIcon();
     const QPixmap pixmap = provider.icon(QFileInfo(dir.filePath(exe))).pixmap(64);
-    if (pixmap.isNull()) return QIcon(":/unknown.png");
+    if (pixmap.isNull()) return unknownIcon();
     pixmap.save(cached);
     return QIcon(pixmap);
 }
@@ -162,6 +173,7 @@ MainWindow::MainWindow(QWidget *parent)
     if (catalog.open(QIODevice::ReadOnly))
         m_versionsJson = catalog.readAll();
     loadInstances();
+    connect(qApp->styleHints(), &QStyleHints::colorSchemeChanged, this, [this]() { loadInstances(); });
     fetchVersions();
     if (ui->versionCombo->currentIndex() >= 0)
         QTimer::singleShot(0, this, &MainWindow::onLaunchTriggered);
