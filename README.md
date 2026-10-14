@@ -1,6 +1,6 @@
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/openkogama/openkogama-site/main/.github/logo/launcher-dark.png">
-  <img src="https://raw.githubusercontent.com/openkogama/openkogama-site/main/.github/logo/launcher-light.png" alt="OpenKogama Launcher" width="400">
+  <source media="(prefers-color-scheme: dark)" srcset=".github/logo-dark.png">
+  <img src=".github/logo-light.png" alt="OpenKogama Launcher" width="400">
 </picture>
 
 The Worlds and Avatars tabs manage your local game data. Add community servers in the Servers tab and click Join to launch the selected KoGaMa version directly. The server chooses its entry world inside the game.
