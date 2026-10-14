@@ -35,7 +35,7 @@ jobs:
           path: openkogama-photon
       - uses: jurplel/install-qt-action@v4
         with:
-          version: 6.8.3
+          version: 6.10.2
           arch: win64_msvc2022_64
           cache: true
       - uses: actions/setup-dotnet@v4
