@@ -11,6 +11,7 @@
 #include <QJsonObject>
 #include <QMessageBox>
 #include <QProcess>
+#include <QUrl>
 #include <QWidget>
 
 static QString instanceTitle(const QString &path)
@@ -37,6 +38,9 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
     }
 
     QString session = url + "/session?mode=" + mode + (world ? "&world=" + QString::number(world) : QString());
+    const QString nickname = Settings::nickname();
+    if (!nickname.isEmpty())
+        session += "&name=" + QString::fromLatin1(QUrl::toPercentEncoding(nickname));
 
     auto *client = new QProcess(owner);
     QDir logs(QDir(path).filePath("logs"));

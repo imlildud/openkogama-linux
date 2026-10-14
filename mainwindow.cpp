@@ -53,6 +53,12 @@ static constexpr int NameRole = Qt::UserRole + 1;
 static constexpr int VersionRole = Qt::UserRole + 2;
 static constexpr int UnityRole = Qt::UserRole + 3;
 
+static QString clientVersion(const QStandardItem *item) {
+    if (!item) return {};
+    const QString version = item->data(VersionRole).toString();
+    return version.isEmpty() && item->data(UnityRole).toString().startsWith("3.4") ? "2012" : version;
+}
+
 static QString versionTitle(const QString &name, const QString &version) {
     if (version.isEmpty()) return name;
     return name == version ? "KoGaMa " + version : name + " (KoGaMa " + version + ")";
@@ -120,8 +126,6 @@ MainWindow::MainWindow(QWidget *parent)
     m_servers = new ServersPage(this);
     ui->mainTabs->insertTab(1, m_servers, "&Servers");
     connect(m_servers, &ServersPage::joinRequested, this, &MainWindow::joinServer);
-    ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(m_servers), false);
-    ui->mainTabs->setTabVisible(ui->mainTabs->indexOf(m_servers), false);
     ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
     connect(ui->actionInstall, &QAction::triggered, this, &MainWindow::onInstallTriggered);
     connect(ui->actionDiscord, &QAction::triggered, this, &MainWindow::onDiscordTriggered);
@@ -576,6 +580,18 @@ bool MainWindow::hasRemoteGames() const {
 }
 
 void MainWindow::joinServer(const QString &address) {
+    const QList<GameServer> servers = Settings::servers();
+    const auto server = std::find_if(servers.cbegin(), servers.cend(), [&](const GameServer &s) { return s.address == address; });
+    if (server != servers.cend() && !server->accepts(clientVersion(instances->item(ui->versionCombo->currentIndex())))) {
+        int match = -1;
+        for (int row = instances->rowCount() - 1; row >= 0 && match < 0; --row)
+            if (server->accepts(clientVersion(instances->item(row)))) match = row;
+        if (match < 0) {
+            QMessageBox::information(this, "Join", "This server accepts " + server->clients.join(", ") + ". Add one of these versions first.");
+            return;
+        }
+        ui->versionCombo->setCurrentIndex(match);
+    }
     const QString path = ui->versionCombo->currentData().toString();
     if (path.isEmpty()) return;
     QString exe;

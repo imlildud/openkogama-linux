@@ -3,8 +3,14 @@
 
 #include <QSettings>
 #include <QUrl>
+#include <QVersionNumber>
+#include <algorithm>
 
 namespace {
+
+const QList<GameServer> DefaultServers = {
+    {QString(), "https://war4.openkogama.org", ">WAR 4< (map by opnfeniks)", {}, {}},
+};
 
 QSettings store()
 {
@@ -29,7 +35,7 @@ QList<GameServer> servers()
             || (!url.path().isEmpty() && url.path() != "/")) continue;
         if (!address.contains("://") && url.port() == -1) url.setPort(8080);
         list.append({settings.value("name").toString(), url.toString(QUrl::StripTrailingSlash),
-            settings.value("title").toString(), settings.value("thumbnail").toByteArray()});
+            settings.value("title").toString(), settings.value("thumbnail").toByteArray(), settings.value("clients").toStringList()});
     }
     settings.endArray();
     return list;
@@ -46,8 +52,25 @@ void setServers(const QList<GameServer> &servers)
         settings.setValue("address", servers[i].address);
         settings.setValue("title", servers[i].title);
         settings.setValue("thumbnail", servers[i].thumbnail);
+        settings.setValue("clients", servers[i].clients);
     }
     settings.endArray();
+}
+
+void addDefaultServers()
+{
+    const QStringList offered = store().value("launcher/offeredServers").toStringList();
+    QStringList added = offered;
+    QList<GameServer> list = servers();
+    for (const GameServer &server : DefaultServers) {
+        if (offered.contains(server.address)) continue;
+        added.append(server.address);
+        if (std::none_of(list.cbegin(), list.cend(), [&](const GameServer &s) { return s.address == server.address; }))
+            list.append(server);
+    }
+    if (added == offered) return;
+    setServers(list);
+    store().setValue("launcher/offeredServers", added);
 }
 
 QString currentServer()
@@ -70,6 +93,16 @@ void setLastInstance(const QString &path)
     store().setValue("launcher/lastInstance", path);
 }
 
+QString nickname()
+{
+    return store().value("player/nickname").toString();
+}
+
+void setNickname(const QString &name)
+{
+    store().setValue("player/nickname", name);
+}
+
 bool consoleOnLaunch()
 {
     return store().value("console/showOnLaunch", false).toBool();
@@ -90,4 +123,21 @@ void setConsoleOnCrash(bool enabled)
     store().setValue("console/showOnCrash", enabled);
 }
 
+}
+
+bool GameServer::accepts(const QString &version) const
+{
+    if (clients.isEmpty()) return true;
+    const QVersionNumber number = QVersionNumber::fromString(version);
+    for (const QString &entry : clients) {
+        const QStringList range = entry.split('-');
+        const QVersionNumber low = QVersionNumber::fromString(range.value(0).trimmed());
+        const QVersionNumber high = QVersionNumber::fromString(range.value(1).trimmed());
+        if (range.size() == 2 && !low.isNull() && !high.isNull()) {
+            if (!number.isNull() && low <= number && number <= high) return true;
+        } else if (entry.trimmed() == version) {
+            return true;
+        }
+    }
+    return false;
 }

@@ -3,7 +3,9 @@
   <img src=".github/logo-light.png" alt="OpenKogama Launcher" width="400">
 </picture>
 
-The Worlds and Avatars tabs manage your local game data.
+The Worlds and Avatars tabs manage your local game data. Add community servers in the Servers tab and click Join to launch the selected KoGaMa version directly. The server chooses its entry world inside the game.
+
+The launcher reads only `/api/server` (`title` and the optional fixed `/api/server/thumbnail` path) for server tiles. Titles are limited to 40 characters, thumbnails to 256 KB and 4096 pixels per side, then cropped to 400 × 160. The last valid title and thumbnail remain cached when the server is offline. Older servers can answer `/ping` without providing tile metadata.
 
 ## Install
 

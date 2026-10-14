@@ -9,11 +9,13 @@
 #include <QMenu>
 #include <QGuiApplication>
 #include <QClipboard>
+#include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QFormLayout>
 #include <QImageReader>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
@@ -34,7 +36,9 @@
 namespace {
 constexpr int TitleRole = Qt::UserRole + 1;
 constexpr int StatusRole = Qt::UserRole + 2;
+constexpr int ClientsRole = Qt::UserRole + 3;
 constexpr qint64 ThumbnailLimit = 256 * 1024;
+constexpr auto HostingGuide = "https://github.com/openkogama/openkogama-server/blob/main/HOSTING.md";
 
 QString titleText(const QString &text)
 {
@@ -118,7 +122,12 @@ ServersPage::ServersPage(QWidget *parent)
     auto *add = new QPushButton("Add server...", this);
     add->setObjectName("addServerButton");
     add->setMinimumHeight(28);
+    auto *host = new QPushButton("Host a server", this);
+    host->setObjectName("hostServerButton");
+    host->setMinimumHeight(28);
+    host->setToolTip("Open the hosting guide in your browser");
     toolbar->addWidget(m_search, 1);
+    toolbar->addWidget(host);
     toolbar->addWidget(add);
     layout->addLayout(toolbar);
 
@@ -165,6 +174,7 @@ ServersPage::ServersPage(QWidget *parent)
     layout->addLayout(actions);
 
     connect(add, &QPushButton::clicked, this, &ServersPage::addServer);
+    connect(host, &QPushButton::clicked, this, []() { QDesktopServices::openUrl(QUrl(HostingGuide)); });
     connect(m_join, &QPushButton::clicked, this, &ServersPage::join);
     connect(m_list, &QListWidget::itemActivated, this, [this]() { join(); });
     connect(m_list, &QListWidget::currentItemChanged, this, [this]() { updateActions(); });
@@ -212,6 +222,7 @@ void ServersPage::load(const QString &select)
         auto *item = new QListWidgetItem(imageTile(server.thumbnail, palette().color(QPalette::Button)), title, m_list);
         item->setData(Qt::UserRole, server.address);
         item->setData(TitleRole, title);
+        item->setData(ClientsRole, server.clients);
         setStatus(server.address, "Checking...");
         if (server.address == select) m_list->setCurrentItem(item);
     }
@@ -251,9 +262,10 @@ void ServersPage::updateActions()
 void ServersPage::setStatus(const QString &address, const QString &status)
 {
     if (auto *item = find(address)) {
+        const QString versions = item->data(ClientsRole).toStringList().join(", ");
         item->setData(StatusRole, status);
-        item->setData(CenteredDelegate::SubtitleRole, status);
-        item->setToolTip(shortAddress(address) + "\n" + status);
+        item->setData(CenteredDelegate::SubtitleRole, versions.isEmpty() ? status : status + QStringLiteral(" · ") + versions);
+        item->setToolTip(shortAddress(address) + "\n" + status + (versions.isEmpty() ? QString() : "\nVersions: " + versions));
     }
 }
 
@@ -310,10 +322,19 @@ void ServersPage::probe(const QString &address)
         auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
         if (it == servers.end()) return;
         const QString title = titleText(document.object().value("title").toString());
-        if (!title.isEmpty()) {
-            it->title = title;
+        QStringList clients;
+        for (const QJsonValue &value : document.object().value("clients").toArray()) {
+            const QString client = value.toString().trimmed().left(64);
+            if (!client.isEmpty()) clients.append(client);
+        }
+        if ((!title.isEmpty() && title != it->title) || clients != it->clients) {
+            if (!title.isEmpty()) it->title = title;
+            it->clients = clients;
             Settings::setServers(servers);
-            if (auto *item = find(address)) {
+        }
+        if (auto *item = find(address)) {
+            item->setData(ClientsRole, clients);
+            if (!title.isEmpty()) {
                 item->setData(TitleRole, title);
                 item->setText(title);
             }
