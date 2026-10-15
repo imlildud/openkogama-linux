@@ -34,6 +34,7 @@ QList<GameServer> servers()
             || !url.userInfo().isEmpty() || url.hasQuery() || url.hasFragment() || url.port() == 0
             || (!url.path().isEmpty() && url.path() != "/")) continue;
         if (!address.contains("://") && url.port() == -1) url.setPort(8080);
+        if (url.path() == "/") url.setPath(QString());
         list.append({settings.value("name").toString(), url.toString(QUrl::StripTrailingSlash),
             settings.value("title").toString(), settings.value("thumbnail").toByteArray(), settings.value("clients").toStringList()});
     }

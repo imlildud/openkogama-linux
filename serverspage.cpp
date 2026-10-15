@@ -400,6 +400,7 @@ void ServersPage::addServer()
             return;
         }
         if (!explicitScheme && url.port() == -1) url.setPort(8080);
+        if (url.path() == "/") url.setPath(QString());
         const QString normalized = url.toString(QUrl::StripTrailingSlash);
         auto servers = Settings::servers();
         auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == normalized; });

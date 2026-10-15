@@ -580,6 +580,12 @@ bool MainWindow::hasRemoteGames() const {
 }
 
 void MainWindow::joinServer(const QString &address) {
+    if (Settings::nickname().isEmpty()) {
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, "Join", "Pick a nickname that other players will see:", QLineEdit::Normal, QString(), &ok).trimmed();
+        if (!ok || name.isEmpty()) return;
+        Settings::setNickname(name.left(20));
+    }
     const QList<GameServer> servers = Settings::servers();
     const auto server = std::find_if(servers.cbegin(), servers.cend(), [&](const GameServer &s) { return s.address == address; });
     if (server != servers.cend() && !server->accepts(clientVersion(instances->item(ui->versionCombo->currentIndex())))) {
