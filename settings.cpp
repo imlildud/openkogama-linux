@@ -10,6 +10,7 @@ namespace {
 
 const QList<GameServer> DefaultServers = {
     {QString(), "https://war4.openkogama.org", ">WAR 4< (map by opnfeniks)", {}, {}},
+    {QString(), "https://hyrule.openkogama.org", "2 Player Zelda (map by Caninos)", {}, {}},
 };
 
 QSettings store()

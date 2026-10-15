@@ -14,6 +14,7 @@
 #include <QDialogButtonBox>
 #include <QEvent>
 #include <QFormLayout>
+#include <QHostAddress>
 #include <QImageReader>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -25,6 +26,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPainter>
+#include <QPointer>
 #include <QPushButton>
 #include <QShortcut>
 #include <QTimer>
@@ -63,6 +65,23 @@ QString shortAddress(const QString &address)
 QString sharedAddress(const QString &address)
 {
     return QUrl(address).scheme() == "https" ? address : shortAddress(address);
+}
+
+QStringList addressCandidates(const QUrl &entered)
+{
+    const QString host = entered.host();
+    const bool plainHttp = !QHostAddress(host).isNull() || host.compare("localhost", Qt::CaseInsensitive) == 0;
+    const auto at = [&host](const QString &scheme, int port) {
+        QUrl url;
+        url.setScheme(scheme);
+        url.setHost(host);
+        url.setPort(port);
+        return url.toString(QUrl::StripTrailingSlash);
+    };
+    const int port = entered.port();
+    if (port != -1)
+        return plainHttp ? QStringList{at("http", port), at("https", port)} : QStringList{at("https", port), at("http", port)};
+    return plainHttp ? QStringList{at("http", 8080), at("https", -1)} : QStringList{at("https", -1), at("http", 8080), at("http", -1)};
 }
 
 QIcon imageTile(const QByteArray &bytes, const QColor &background)
@@ -399,24 +418,55 @@ void ServersPage::addServer()
             QMessageBox::warning(&dialog, "Add server", "Enter a server host with an optional port, or an HTTP/HTTPS address.");
             return;
         }
-        if (!explicitScheme && url.port() == -1) url.setPort(8080);
         if (url.path() == "/") url.setPath(QString());
-        const QString normalized = url.toString(QUrl::StripTrailingSlash);
-        auto servers = Settings::servers();
-        auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == normalized; });
-        const QString title = titleText(name->text().trimmed().isEmpty() ? url.host() : name->text());
-        if (it == servers.end()) servers.append({title, normalized, {}, {}});
-        else it->name = title;
-        Settings::setServers(servers);
-        Settings::setCurrentServer(normalized);
-        load(normalized);
-        refresh();
-        dialog.accept();
+        const QString chosenName = name->text().trimmed();
+        if (explicitScheme) {
+            keepServer(url.toString(QUrl::StripTrailingSlash), chosenName);
+            dialog.accept();
+            return;
+        }
+        const QStringList candidates = addressCandidates(url);
+        name->setEnabled(false);
+        address->setEnabled(false);
+        confirm->setEnabled(false);
+        confirm->setText("Checking...");
+        QPointer<QDialog> open(&dialog);
+        resolve(candidates, [this, open, candidates, chosenName](const QString &found) {
+            if (!open || !open->isVisible()) return;
+            keepServer(found.isEmpty() ? candidates.first() : found, chosenName);
+            open->accept();
+        });
     });
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     layout->addWidget(buttons);
     address->setFocus();
     dialog.exec();
+}
+
+void ServersPage::resolve(QStringList candidates, std::function<void(const QString &)> done)
+{
+    if (candidates.isEmpty()) {
+        done({});
+        return;
+    }
+    const QString address = candidates.takeFirst();
+    get(address + "/api/server", 4096, [this, address, candidates, done](int status, const QByteArray &data) {
+        if (status == 200 && QJsonDocument::fromJson(data).isObject()) done(address);
+        else resolve(candidates, done);
+    });
+}
+
+void ServersPage::keepServer(const QString &address, const QString &name)
+{
+    auto servers = Settings::servers();
+    auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
+    const QString title = titleText(name.isEmpty() ? QUrl(address).host() : name);
+    if (it == servers.end()) servers.append({title, address, {}, {}});
+    else it->name = title;
+    Settings::setServers(servers);
+    Settings::setCurrentServer(address);
+    load(address);
+    refresh();
 }
 
 void ServersPage::removeServer()

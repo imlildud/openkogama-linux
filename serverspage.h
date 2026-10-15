@@ -32,6 +32,8 @@ private:
     void refresh();
     void probe(const QString &address);
     void get(const QString &url, qint64 limit, std::function<void(int, const QByteArray &)> done);
+    void resolve(QStringList candidates, std::function<void(const QString &)> done);
+    void keepServer(const QString &address, const QString &name);
     void fetchThumbnail(const QString &address);
     void setStatus(const QString &address, const QString &status);
     void updateActions();
