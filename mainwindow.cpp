@@ -137,6 +137,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_servers, &ServersPage::joinRequested, this, &MainWindow::joinServer);
     m_share = new ShareBar(this);
     ui->verticalLayout->insertWidget(ui->verticalLayout->indexOf(ui->mainTabs), m_share);
+    connect(m_share, &ShareBar::listed, this, [this](const QString &address, const QString &title) {
+        if (!m_hostClient || m_hostClient->property("listed").toString() == address) return;
+        m_hostClient->setProperty("listed", address);
+        DiscordPresence::join(m_hostClient, address, title);
+        m_servers->reportPlaying(m_hostClient, address);
+    });
     auto *guide = new QAction("Host a server that stays online...", this);
     connect(guide, &QAction::triggered, this, []() {
         QDesktopServices::openUrl(QUrl("https://github.com/openkogama/openkogama-server/blob/main/HOSTING.md"));
@@ -564,7 +570,8 @@ bool MainWindow::launchInstance(const QString &path) {
 
     if (!m_worlds) {
         m_worlds = new WorldsDialog(path, exe, server, this);
-        connect(m_worlds, &WorldsDialog::hostRequested, this, [this](int world, const QString &name) {
+        connect(m_worlds, &WorldsDialog::hostRequested, this, [this](int world, const QString &name, QProcess *client) {
+            m_hostClient = client;
             m_share->share(world, name, clientVersion(instances->item(ui->versionCombo->currentIndex())));
         });
         m_worlds->setWindowFlags(Qt::Widget);
@@ -660,7 +667,7 @@ void MainWindow::openLink(const QString &link) {
     }
     const QString title = m_servers->titleOf(address);
     const QString shown = !title.isEmpty() ? title
-        : Tunnel::isAddress(address) ? "the world with the code " + Tunnel::display(Tunnel::code(address)) : QUrl(address).host();
+        : Tunnel::isAddress(address) ? Tunnel::display(Tunnel::code(address)) : QUrl(address).host();
     if (QMessageBox::question(this, "Join", "Join " + shown + "?") != QMessageBox::Yes) return;
     joinServer(address);
 }

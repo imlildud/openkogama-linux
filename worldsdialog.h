@@ -28,7 +28,7 @@ public:
     void reject() override;
 
 signals:
-    void hostRequested(int world, const QString &name);
+    void hostRequested(int world, const QString &name, QProcess *client);
 
 protected:
     void keyPressEvent(QKeyEvent *event) override;
@@ -51,7 +51,7 @@ private:
     void deleteWorld();
     void onWorldRenamed(QListWidgetItem *item);
     void showWorldMenu(const QPoint &pos);
-    void launch(const QString &mode, int world);
+    QProcess *launch(const QString &mode, int world);
     int selectedWorld() const;
     void loadAvatars(int select = 0);
     void loadAvatarPicture(QListWidgetItem *item, int avatar, const QString &version);

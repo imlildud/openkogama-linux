@@ -15,6 +15,7 @@ class QListWidget;
 class QListWidgetItem;
 class QNetworkAccessManager;
 class QPushButton;
+class QShowEvent;
 class QTabBar;
 class QToolButton;
 
@@ -38,6 +39,7 @@ signals:
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
+    void showEvent(QShowEvent *event) override;
 
 private:
     struct PublicServer

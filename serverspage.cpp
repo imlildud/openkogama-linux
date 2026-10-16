@@ -46,6 +46,7 @@ constexpr qint64 ListLimit = 256 * 1024;
 constexpr int PublicLimit = 200;
 constexpr int ClientsLimit = 10;
 constexpr int PlayingEveryMs = 60000;
+constexpr int RefreshMs = 10000;
 
 QString playersText(int count)
 {
@@ -66,7 +67,7 @@ QString titleText(const QString &text)
 
 QString shortAddress(const QString &address)
 {
-    if (Tunnel::isAddress(address)) return "Code " + Tunnel::display(Tunnel::code(address));
+    if (Tunnel::isAddress(address)) return Tunnel::display(Tunnel::code(address));
     const QUrl url(address);
     if (url.host().isEmpty()) return address;
     const bool defaultPort = url.port() == -1 || (url.scheme() == "http" && url.port() == 8080) || (url.scheme() == "https" && url.port() == 443);
@@ -227,9 +228,17 @@ ServersPage::ServersPage(QWidget *parent)
     remove->setContext(Qt::WidgetShortcut);
     connect(remove, &QShortcut::activated, this, &ServersPage::removeServer);
     auto *timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, this, &ServersPage::refresh);
-    timer->start(30000);
+    connect(timer, &QTimer::timeout, this, [this]() {
+        if (isVisible()) refresh();
+    });
+    timer->start(RefreshMs);
     load(Settings::currentServer());
+    refresh();
+}
+
+void ServersPage::showEvent(QShowEvent *event)
+{
+    QWidget::showEvent(event);
     refresh();
 }
 
@@ -380,17 +389,20 @@ void ServersPage::refresh()
 
 void ServersPage::reportPlaying(QObject *game, const QString &address)
 {
-    auto send = [this, address]() {
+    auto send = [this, address](bool left) {
         QNetworkRequest request{QUrl(Settings::publicList() + "/playing")};
         request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
         request.setTransferTimeout(8000);
-        QNetworkReply *reply = m_net->post(request, QJsonDocument(QJsonObject{{"address", address}}).toJson(QJsonDocument::Compact));
+        QJsonObject body{{"address", address}};
+        if (left) body.insert("left", true);
+        QNetworkReply *reply = m_net->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
         connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
     };
     auto *timer = new QTimer(game);
-    connect(timer, &QTimer::timeout, this, send);
+    connect(timer, &QTimer::timeout, this, [send]() { send(false); });
+    connect(game, &QObject::destroyed, this, [send]() { send(true); });
     timer->start(PlayingEveryMs);
-    send();
+    send(false);
 }
 
 void ServersPage::fetchPublic()
@@ -421,8 +433,13 @@ void ServersPage::fetchPublic()
             servers.append(server);
             if (servers.size() == PublicLimit) break;
         }
+        const auto same = [](const PublicServer &a, const PublicServer &b) {
+            return a.address == b.address && a.title == b.title && a.clients == b.clients && a.players == b.players && a.thumbnail == b.thumbnail;
+        };
+        const bool changed = servers.size() != m_public.size() || !std::equal(servers.cbegin(), servers.cend(), m_public.cbegin(), same);
         m_public = servers;
-        if (m_showPublic) load(selectedAddress());
+        if (m_showPublic && changed) load(selectedAddress());
+        else if (m_showPublic) filter();
         for (const PublicServer &server : std::as_const(m_public)) {
             if (!server.thumbnail || m_thumbnails.contains(server.address)) continue;
             m_thumbnails.insert(server.address, {});

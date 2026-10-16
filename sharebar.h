@@ -4,6 +4,7 @@
 #include <QPointer>
 
 class QLabel;
+class QNetworkAccessManager;
 class QPushButton;
 class QTimer;
 class Tunnel;
@@ -22,6 +23,7 @@ public:
 
 signals:
     void settingsRequested();
+    void listed(const QString &address, const QString &title);
 
 private:
     void start();
@@ -36,12 +38,15 @@ private:
     QPushButton *m_settings;
     QPushButton *m_stop;
     QTimer *m_slow;
+    QNetworkAccessManager *m_net = nullptr;
     QPointer<Tunnel> m_tunnel;
     QString m_name;
+    QString m_title;
     QString m_version;
     QString m_codeText;
     QString m_error;
     int m_world = 0;
     int m_players = 0;
     bool m_waiting = false;
+    bool m_listed = false;
 };

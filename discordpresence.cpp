@@ -1,6 +1,5 @@
 #include "discordpresence.h"
 #include "settings.h"
-#include "tunnel.h"
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QJsonArray>
@@ -52,7 +51,7 @@ void sendActivity()
     const Game &game = games.last();
     const QJsonObject button = game.join.isEmpty()
         ? QJsonObject{{"label", "Play OpenKogama"}, {"url", WebsiteUrl}}
-        : QJsonObject{{"label", Tunnel::isAddress(game.join) ? "Join this world" : "Join this server"},
+        : QJsonObject{{"label", "Join this server"},
             {"url", WebsiteUrl + "/join/?server=" + QString::fromLatin1(QUrl::toPercentEncoding(game.join))}};
     const QJsonObject activity{
         {"details", game.details.left(TextLimit)},

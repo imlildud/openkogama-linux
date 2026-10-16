@@ -83,8 +83,8 @@ WorldsDialog::WorldsDialog(const QString &path, const QString &exe, QProcess *se
     connect(ui->hostButton, &QPushButton::clicked, this, [this]() {
         const int world = selectedWorld();
         if (world == 0) return;
-        emit hostRequested(world, ui->worldsList->currentItem()->data(NameRole).toString());
-        launch("play", world);
+        const QString name = ui->worldsList->currentItem()->data(NameRole).toString();
+        emit hostRequested(world, name, launch("play", world));
     });
     connect(ui->editAvatarButton, &QPushButton::clicked, this, &WorldsDialog::editAvatar);
     connect(ui->newButton, &QPushButton::clicked, this, &WorldsDialog::createWorld);
@@ -789,13 +789,14 @@ int WorldsDialog::selectedWorld() const {
     return item ? item->data(Qt::UserRole).toInt() : 0;
 }
 
-void WorldsDialog::launch(const QString &mode, int world) {
+QProcess *WorldsDialog::launch(const QString &mode, int world) {
     if (mode != "avatar" && world == 0) {
         QMessageBox::information(this, "Worlds", "Select a world first");
-        return;
+        return nullptr;
     }
     QProcess *client = GameLauncher::start(m_path, m_exe, LocalServerUrl, mode, world, m_owner, this);
-    if (!client) return;
+    if (!client) return nullptr;
     m_clients.append(client);
     connect(client, &QProcess::finished, this, [this, client]() { m_clients.removeAll(client); });
+    return client;
 }

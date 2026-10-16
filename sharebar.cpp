@@ -9,8 +9,11 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QPushButton>
 #include <QTimer>
+#include <QUrl>
 
 namespace {
 constexpr int SlowMs = 10000;
@@ -93,6 +96,16 @@ void ShareBar::restart()
 
 void ShareBar::stop()
 {
+    if (m_tunnel && m_listed) {
+        if (!m_net) m_net = new QNetworkAccessManager(this);
+        QNetworkRequest request{QUrl(Settings::publicList() + "/announce")};
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        request.setTransferTimeout(8000);
+        const QJsonObject goodbye{{"secret", Settings::hostSecret()}, {"left", true}};
+        QNetworkReply *reply = m_net->post(request, QJsonDocument(goodbye).toJson(QJsonDocument::Compact));
+        connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
+    }
+    m_listed = false;
     if (m_tunnel) {
         Tunnel *tunnel = m_tunnel;
         m_tunnel = nullptr;
@@ -109,15 +122,16 @@ void ShareBar::stop()
 void ShareBar::start()
 {
     const QJsonObject config = ServerConfigDialog::current();
-    const QString nickname = Settings::nickname();
     QString title = config.value("title").toString().trimmed();
-    if (title.isEmpty()) title = nickname.isEmpty() ? m_name : m_name + " (" + nickname + ")";
+    if (title.isEmpty()) title = m_name;
+    m_title = title;
+    m_listed = config.value("public").toBool();
     QJsonArray clients = config.value("clients").toArray();
     if (clients.isEmpty() && !config.value("mixedClients").toBool()) clients.append(m_version);
     const QJsonObject info{{"title", title}, {"version", clients.size() == 1 ? clients.first().toString() : QString()},
         {"clients", clients}, {"world", m_world}};
     Tunnel *tunnel = Tunnel::host(Settings::hostSecret(), QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact)),
-        config.value("public").toBool(), this);
+        m_listed, this);
     m_tunnel = tunnel;
     connect(tunnel, &Tunnel::said, this, [this, tunnel](const QString &word, const QString &rest) {
         if (tunnel == m_tunnel) heard(word, rest);
@@ -134,6 +148,7 @@ void ShareBar::heard(const QString &word, const QString &rest)
     if (word == "code") {
         m_codeText = Tunnel::normalize(rest);
         m_slow->stop();
+        if (m_listed && !m_codeText.isEmpty()) emit listed(Tunnel::address(m_codeText), m_title);
     } else if (word == "players") {
         m_players = rest.toInt();
     } else if (word == "error") {

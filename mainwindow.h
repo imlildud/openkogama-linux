@@ -70,6 +70,7 @@ private:
     QNetworkAccessManager *m_net = nullptr;
     ServersPage *m_servers;
     QList<QPointer<QProcess>> m_remoteClients;
+    QPointer<QProcess> m_hostClient;
     QString m_activePath;
     bool m_installing = false;
     bool m_localReady = false;

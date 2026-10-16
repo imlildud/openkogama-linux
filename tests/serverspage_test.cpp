@@ -271,7 +271,7 @@ private slots:
             auto *list = page.findChild<QListWidget *>("serversList");
             QTRY_COMPARE(tile(list->item(0)), QString::fromUtf8("Fake world (Ann)\nOnline · 3.5.20"));
             QCOMPARE(Settings::servers().first().clients, QStringList({"3.5.20"}));
-            QCOMPARE(page.findChild<QLabel *>("selectedServerAddress")->text(), QString("Code ABC-DEF"));
+            QCOMPARE(page.findChild<QLabel *>("selectedServerAddress")->text(), QString("ABC-DEF"));
         }
         QDir(server).removeRecursively();
     }
