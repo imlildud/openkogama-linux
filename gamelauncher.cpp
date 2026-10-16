@@ -44,7 +44,7 @@ static QString presenceDetails(const QString &url, const QString &mode)
     return "Playing online";
 }
 
-QProcess *GameLauncher::start(const QString &path, const QString &exe, const QString &url, const QString &mode, int world, QWidget *owner, QWidget *parent) {
+QProcess *GameLauncher::start(const QString &path, const QString &exe, const QString &url, const QString &mode, int world, QWidget *owner, QWidget *parent, bool viaCode) {
     const QString title = instanceTitle(path);
     const bool local = url == LocalServerUrl;
     QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
@@ -76,7 +76,8 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
                 QMessageBox::information(parent, "Worlds", "This version has no avatar editor");
                 return nullptr;
             }
-            QString query = "?Username=1&Password=&PlanetName=" + QString::number(world) + "&EditMode=" + (mode == "play" ? "false" : "true");
+            const QString username = viaCode && !nickname.isEmpty() ? QString::fromLatin1(QUrl::toPercentEncoding(nickname)) : "1";
+            QString query = "?Username=" + username + "&Password=&PlanetName=" + QString::number(world) + "&EditMode=" + (mode == "play" ? "false" : "true");
             client->setArguments({file + query, "--serve-as", url + "/kogama2012/WebPlayer.unity3d",
                 "--title", title, "--log", QDir::toNativeSeparators(log)});
         } else {

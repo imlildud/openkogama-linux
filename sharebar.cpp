@@ -76,8 +76,7 @@ void ShareBar::share(int world, const QString &name, const QString &version)
     m_codeText.clear();
     m_error.clear();
     m_players = 0;
-    if (version == "2012") m_error = "KoGaMa 2012 can't be hosted with a code yet";
-    else start();
+    start();
     refresh();
     show();
 }

@@ -715,7 +715,7 @@ void MainWindow::joinCode(const QString &address) {
     auto launch = [this, address, trip, tunnel, dismiss]() {
         if (trip->launched || trip->path.isEmpty() || trip->port == 0) return;
         dismiss();
-        QProcess *client = GameLauncher::start(trip->path, trip->exe, "http://127.0.0.1:" + QString::number(trip->port), "play", trip->world, this, this);
+        QProcess *client = GameLauncher::start(trip->path, trip->exe, "http://127.0.0.1:" + QString::number(trip->port), "play", trip->world, this, this, true);
         if (!client) {
             if (tunnel) tunnel->stop();
             return;
@@ -757,9 +757,8 @@ void MainWindow::joinCode(const QString &address) {
                 for (int candidate = instances->rowCount() - 1; candidate >= 0 && row < 0; --candidate)
                     if (host.accepts(clientVersion(instances->item(candidate)))) row = candidate;
             }
-            if (row < 0 || clientVersion(instances->item(row)) == "2012") {
-                trip->error = row < 0 ? "This world needs KoGaMa " + host.clients.join(", ") + ". Add one of these versions first."
-                    : "KoGaMa 2012 can't join with a code yet.";
+            if (row < 0) {
+                trip->error = "This world needs KoGaMa " + host.clients.join(", ") + ". Add one of these versions first.";
                 if (tunnel) tunnel->stop();
                 return;
             }
