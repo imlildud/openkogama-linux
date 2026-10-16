@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QNetworkReply>
+#include <QRandomGenerator>
 #include <QTcpServer>
 #include <QTimer>
 #include <QUdpSocket>
@@ -20,7 +21,9 @@ static constexpr int AssetsEnd = 50;
 static constexpr int DefaultHttpPort = 8080;
 static constexpr int DefaultPhotonPort = 5055;
 static constexpr int PortBusy = 3;
-static constexpr int PortTries = 20;
+static constexpr int PortTries = 50;
+static constexpr int MinPort = 20000;
+static constexpr int MaxPort = 32767;
 static constexpr qint64 LogTail = 8192;
 
 static QNetworkRequest pingRequest(const QString &path = "/ping") {
@@ -41,11 +44,8 @@ static bool udpFree(int port) {
 
 static int freePort(bool udp) {
     for (int attempt = 0; attempt < PortTries; ++attempt) {
-        QTcpServer probe;
-        if (!probe.listen(QHostAddress::Any, 0)) continue;
-        const int port = probe.serverPort();
-        probe.close();
-        if (!udp || udpFree(port)) return port;
+        const int port = int(QRandomGenerator::global()->bounded(MinPort, MaxPort + 1));
+        if (tcpFree(port) && (!udp || udpFree(port))) return port;
     }
     return 0;
 }

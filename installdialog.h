@@ -22,6 +22,7 @@ struct Version {
     QString sha256;
     qint64 zipSize = 0;
     QString id;
+    qint64 unpackedSize = 0;
 };
 
 class InstallDialog : public QDialog
@@ -32,6 +33,7 @@ public:
     explicit InstallDialog(const QByteArray &versionsJson, QWidget *parent = nullptr);
     ~InstallDialog();
     Version selectedVersion() const;
+    QList<Version> selectedVersions() const;
     QString instanceName() const;
     static QList<Version> parse(const QByteArray &versionsJson);
 
@@ -42,6 +44,8 @@ private:
     void loadVersions();
     void populate(const QByteArray &data);
     void onVersionSelected(const QModelIndex &current, const QModelIndex &previous);
+    void showSelection();
+    void showVersion(const Version &version);
     QList<Version> versions;
 };
 

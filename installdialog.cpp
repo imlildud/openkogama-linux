@@ -7,6 +7,11 @@
 #include <QHeaderView>
 #include <QStandardItemModel>
 #include <QDebug>
+#include <algorithm>
+
+namespace {
+constexpr int MaxListed = 3;
+}
 
 InstallDialog::InstallDialog(const QByteArray &versionsJson, QWidget *parent)
     : QDialog(parent)
@@ -29,6 +34,17 @@ Version InstallDialog::selectedVersion() const {
     return versions[proxy->mapToSource(current).row()];
 }
 
+QList<Version> InstallDialog::selectedVersions() const {
+    QList<int> rows;
+    for (const QModelIndex &index : ui->versionsTreeView->selectionModel()->selectedRows())
+        rows.append(proxy->mapToSource(index).row());
+    std::sort(rows.begin(), rows.end());
+    QList<Version> chosen;
+    for (int row : std::as_const(rows)) chosen.append(versions[row]);
+    if (chosen.isEmpty() && ui->versionsTreeView->currentIndex().isValid()) chosen.append(selectedVersion());
+    return chosen;
+}
+
 QString InstallDialog::instanceName() const {
     QString name = ui->versionNameLineEdit->text().trimmed();
     return name.isEmpty() ? selectedVersion().version : name;
@@ -36,15 +52,45 @@ QString InstallDialog::instanceName() const {
 
 void InstallDialog::onVersionSelected(const QModelIndex &current, const QModelIndex &previous) {
     if (!current.isValid()) return;
-    auto object = versions[proxy->mapToSource(current).row()];
-    ui->versionValue->setText(object.version);
-    ui->releasedValue->setText(object.date);
-    ui->unityValue->setText(object.unity);
-    ui->backendValue->setText(object.backend);
-    ui->downloadValue->setText(object.download);
-    ui->installedValue->setText(object.installed);
-    ui->shaValue->setText(object.sha);
-    ui->versionNameLineEdit->setPlaceholderText(object.version);
+    showSelection();
+}
+
+void InstallDialog::showVersion(const Version &version) {
+    ui->versionValue->setText(version.version);
+    ui->releasedValue->setText(version.date);
+    ui->unityValue->setText(version.unity);
+    ui->backendValue->setText(version.backend);
+    ui->downloadValue->setText(version.download);
+    ui->installedValue->setText(version.installed);
+    ui->shaValue->setText(version.sha);
+    ui->versionNameLineEdit->setPlaceholderText(version.version);
+}
+
+void InstallDialog::showSelection() {
+    const QList<Version> chosen = selectedVersions();
+    ui->versionNameLineEdit->setEnabled(chosen.size() <= 1);
+    if (chosen.size() == 1) showVersion(chosen.first());
+    if (chosen.size() <= 1) return;
+    qint64 download = 0;
+    qint64 unpacked = 0;
+    QStringList unity;
+    QStringList backend;
+    for (const Version &version : chosen) {
+        download += version.zipSize;
+        unpacked += version.unpackedSize;
+        if (!unity.contains(version.unity)) unity.append(version.unity);
+        if (!backend.contains(version.backend)) backend.append(version.backend);
+    }
+    const auto shortList = [](const QStringList &items) {
+        return items.size() <= MaxListed ? items.join(", ") : items.mid(0, MaxListed).join(", ") + " and " + QString::number(items.size() - MaxListed) + " more";
+    };
+    ui->versionValue->setText(QString::number(chosen.size()) + " versions");
+    ui->releasedValue->setText(chosen.last().date == chosen.first().date ? chosen.first().date : chosen.last().date + " to " + chosen.first().date);
+    ui->unityValue->setText(shortList(unity));
+    ui->backendValue->setText(backend.join(", "));
+    ui->downloadValue->setText(QLocale().formattedDataSize(download));
+    ui->installedValue->setText(QLocale().formattedDataSize(unpacked));
+    ui->shaValue->setText(QString());
 }
 
 QList<Version> InstallDialog::parse(const QByteArray &data) {
@@ -66,7 +112,8 @@ QList<Version> InstallDialog::parse(const QByteArray &data) {
         else backend = "Mono";
         qint64 zipSize = object.value("zipSize").toVariant().toLongLong();
         QString download = QLocale().formattedDataSize(zipSize);
-        QString installed = QLocale().formattedDataSize(object.value("unpackedSize").toVariant().toLongLong());
+        qint64 unpackedSize = object.value("unpackedSize").toVariant().toLongLong();
+        QString installed = QLocale().formattedDataSize(unpackedSize);
         QString sha256 = object.value("sha256").toString();
         QString id = object.value("id").toString();
 
@@ -75,7 +122,7 @@ QList<Version> InstallDialog::parse(const QByteArray &data) {
             urls.append(u.toString());
 
         parsed.append({version, date, unity, backend, download, installed,
-                       sha256.left(7), urls, sha256, zipSize, id});
+                       sha256.left(7), urls, sha256, zipSize, id, unpackedSize});
     }
     return parsed;
 }
@@ -98,7 +145,9 @@ void InstallDialog::loadVersions() {
 
     ui->versionsTreeView->setModel(proxy);
 
+    ui->versionsTreeView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     connect(ui->versionsTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this, &InstallDialog::onVersionSelected);
+    connect(ui->versionsTreeView->selectionModel(), &QItemSelectionModel::selectionChanged, this, &InstallDialog::showSelection);
     connect(ui->searchLineEdit, &QLineEdit::textChanged, proxy, &QSortFilterProxyModel::setFilterFixedString);
 
     ui->versionsTreeView->setCurrentIndex(QModelIndex());

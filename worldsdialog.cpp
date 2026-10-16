@@ -400,12 +400,20 @@ void WorldsDialog::createWorld() {
 }
 
 void WorldsDialog::importWorld() {
-    QString path = QFileDialog::getOpenFileName(this, "Import World", QString(), "KoGaMa maps (*.kgmap *.kgm)");
-    if (path.isEmpty()) return;
+    const QStringList paths = QFileDialog::getOpenFileNames(this, "Import worlds", QString(), "KoGaMa maps (*.kgmap *.kgm)");
+    if (!paths.isEmpty()) importWorlds(paths, {});
+}
 
+void WorldsDialog::importWorlds(QStringList paths, QStringList failed) {
+    if (paths.isEmpty()) {
+        if (!failed.isEmpty())
+            QMessageBox::warning(this, "Import", (failed.size() == 1 ? "This map could not be imported: " : "These maps could not be imported: ") + failed.join(", "));
+        return;
+    }
+    const QString path = paths.takeFirst();
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "Import", "Could not read " + path);
+        importWorlds(paths, failed << QFileInfo(path).fileName());
         return;
     }
 
@@ -422,12 +430,13 @@ void WorldsDialog::importWorld() {
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/octet-stream");
     const QByteArray data = file.readAll();
     QNetworkReply *reply = m_net->post(request, data);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, data]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, data, path, paths, failed]() mutable {
         reply->deleteLater();
         int id = QJsonDocument::fromJson(reply->readAll()).object()["id"].toInt();
-        if (id == 0) QMessageBox::warning(this, "Import", "This map could not be imported");
+        if (id == 0) failed << QFileInfo(path).fileName();
         else findArchiveThumbnail(id, data);
         loadWorlds(id);
+        importWorlds(paths, failed);
     });
 }
 
@@ -686,23 +695,32 @@ void WorldsDialog::activateAvatar(int avatar, std::function<void()> done) {
 }
 
 void WorldsDialog::importAvatar() {
-    QString path = QFileDialog::getOpenFileName(this, "Import Avatar", QString(), "KoGaMa avatars (*.kgavatar *.json)");
-    if (path.isEmpty()) return;
+    const QStringList paths = QFileDialog::getOpenFileNames(this, "Import avatars", QString(), "KoGaMa avatars (*.kgavatar *.json)");
+    if (!paths.isEmpty()) importAvatars(paths, {});
+}
 
+void WorldsDialog::importAvatars(QStringList paths, QStringList failed) {
+    if (paths.isEmpty()) {
+        if (!failed.isEmpty())
+            QMessageBox::warning(this, "Import", (failed.size() == 1 ? "This file is not an avatar: " : "These files are not avatars: ") + failed.join(", "));
+        return;
+    }
+    const QString path = paths.takeFirst();
     QFile file(path);
     if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "Import", "Could not read " + path);
+        importAvatars(paths, failed << QFileInfo(path).fileName());
         return;
     }
 
     QNetworkRequest request(QUrl(LocalServerUrl + "/api/avatars/import"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QNetworkReply *reply = m_net->post(request, file.readAll());
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, path, paths, failed]() mutable {
         reply->deleteLater();
         int id = QJsonDocument::fromJson(reply->readAll()).object()["id"].toInt();
-        if (id == 0) QMessageBox::warning(this, "Import", "This file is not an avatar");
+        if (id == 0) failed << QFileInfo(path).fileName();
         loadAvatars(id);
+        importAvatars(paths, failed);
     });
 }
 

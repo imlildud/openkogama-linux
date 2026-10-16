@@ -364,9 +364,15 @@ void MainWindow::onInstallTriggered() {
     }
     InstallDialog dialog(m_versionsJson, this);
     if (dialog.exec() == QDialog::Accepted) {
-        InstallProgressDialog progress(dialog.selectedVersion(), dialog.instanceName(), this);
-        if (progress.exec() == QDialog::Accepted) {
-            loadInstances(progress.installedPath());
+        const QList<Version> chosen = dialog.selectedVersions();
+        QString installed;
+        for (const Version &version : chosen) {
+            InstallProgressDialog progress(version, chosen.size() == 1 ? dialog.instanceName() : version.version, this);
+            if (progress.exec() != QDialog::Accepted) break;
+            installed = progress.installedPath();
+        }
+        if (!installed.isEmpty()) {
+            loadInstances(installed);
             ui->mainTabs->setCurrentWidget(ui->playTab);
             onLaunchTriggered();
         }

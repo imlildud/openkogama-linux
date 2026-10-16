@@ -44,6 +44,7 @@ private:
     void checkRevision();
     void createWorld();
     void importWorld();
+    void importWorlds(QStringList paths, QStringList failed);
     void findArchiveThumbnail(int world, const QByteArray &file);
     void downloadArchiveThumbnail(int world, const QUrl &url);
     void exportWorld();
@@ -59,6 +60,7 @@ private:
     void editAvatar();
     void activateAvatar(int avatar, std::function<void()> done);
     void importAvatar();
+    void importAvatars(QStringList paths, QStringList failed);
     void exportAvatar();
     void renameAvatar();
     void onAvatarRenamed(QListWidgetItem *item);
