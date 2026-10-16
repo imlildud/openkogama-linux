@@ -363,7 +363,7 @@ void ServersPage::probe(const QString &address)
         }
         setStatus(address, "Online");
         filter();
-        if (document.object().value("thumbnail").toString() == "/api/server/thumbnail") fetchThumbnail(address);
+        if (document.object().value("thumbnail").toString() == "/api/server/thumbnail") fetchThumbnail(address, address);
     });
 }
 
@@ -388,8 +388,7 @@ void ServersPage::probeCode(const QString &address)
 void ServersPage::showFound(const QString &address, const QJsonObject &info)
 {
     const QString title = titleText(info.value("title").toString());
-    const QString version = info.value("version").toString().trimmed().left(64);
-    const QStringList clients = version.isEmpty() ? QStringList() : QStringList{version};
+    const QStringList clients = Tunnel::clients(info);
     auto servers = Settings::servers();
     auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
     if (it != servers.end() && ((!title.isEmpty() && title != it->title) || clients != it->clients)) {
@@ -408,9 +407,17 @@ void ServersPage::showFound(const QString &address, const QJsonObject &info)
     filter();
 }
 
-void ServersPage::fetchThumbnail(const QString &address)
+void ServersPage::probeThrough(const QString &address, const QString &base)
 {
-    get(address + "/api/server/thumbnail", ThumbnailLimit, [this, address](int status, const QByteArray &data) {
+    get(base + "/api/server", 4096, [this, address, base](int status, const QByteArray &data) {
+        if (status == 200 && QJsonDocument::fromJson(data).object().value("thumbnail").toString() == "/api/server/thumbnail")
+            fetchThumbnail(address, base);
+    });
+}
+
+void ServersPage::fetchThumbnail(const QString &address, const QString &base)
+{
+    get(base + "/api/server/thumbnail", ThumbnailLimit, [this, address](int status, const QByteArray &data) {
         if (status != 200) return;
         const QByteArray thumbnail = normalizedThumbnail(data);
         if (thumbnail.isEmpty()) return;

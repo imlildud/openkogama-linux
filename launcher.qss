@@ -118,3 +118,4 @@ QCheckBox::indicator:checked { background: #3a7a80; border-color: #3a7a80; image
 QProgressBar { background: @field@; border: 1px solid @border@; border-radius: 4px; text-align: center; color: @text@; }
 QProgressBar::chunk { background: #3a7a80; border-radius: 3px; }
 QFrame#shareBar { background: @alternate@; border: 1px solid @border@; border-left: 3px solid #3a7a80; border-radius: 6px; }
+QLabel#serverConfigError { color: #e05d5d; }

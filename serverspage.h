@@ -22,6 +22,7 @@ public:
     explicit ServersPage(QWidget *parent = nullptr);
     void setCanJoin(bool enabled);
     void showFound(const QString &address, const QJsonObject &info);
+    void probeThrough(const QString &address, const QString &base);
 
 signals:
     void joinRequested(const QString &address);
@@ -37,7 +38,7 @@ private:
     void get(const QString &url, qint64 limit, std::function<void(int, const QByteArray &)> done);
     void resolve(QStringList candidates, std::function<void(const QString &)> done);
     void keepServer(const QString &address, const QString &name);
-    void fetchThumbnail(const QString &address);
+    void fetchThumbnail(const QString &address, const QString &base);
     void setStatus(const QString &address, const QString &status);
     void updateActions();
     void filter();

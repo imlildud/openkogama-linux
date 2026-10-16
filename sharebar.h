@@ -17,7 +17,11 @@ public:
     void share(int world, const QString &name, const QString &version);
     void setVersion(const QString &version);
     void stop();
+    void restart();
     int players() const { return m_players; }
+
+signals:
+    void settingsRequested();
 
 private:
     void start();
@@ -29,6 +33,7 @@ private:
     QLabel *m_code;
     QLabel *m_info;
     QPushButton *m_copy;
+    QPushButton *m_settings;
     QPushButton *m_stop;
     QTimer *m_slow;
     QPointer<Tunnel> m_tunnel;

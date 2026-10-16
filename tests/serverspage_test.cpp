@@ -2,6 +2,8 @@
 #include "settings.h"
 #include "tunnel.h"
 #include "sharebar.h"
+#include "serverconfigdialog.h"
+#include "paths.h"
 #include "gamelauncher.h"
 #include "centereddelegate.h"
 #include <QApplication>
@@ -14,6 +16,8 @@
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
+#include <QDialogButtonBox>
+#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QShortcut>
 #include <QSignalSpy>
@@ -236,6 +240,26 @@ private slots:
             QCOMPARE(bar.players(), 0);
         }
         QDir(server).removeRecursively();
+    }
+
+    void serverSettingsCheckTheJson()
+    {
+        ServerConfigDialog dialog;
+        auto *edit = dialog.findChild<QPlainTextEdit *>("serverConfigEdit");
+        auto *error = dialog.findChild<QLabel *>("serverConfigError");
+        auto *save = dialog.findChild<QDialogButtonBox *>()->button(QDialogButtonBox::Save);
+        edit->setPlainText("{\n  \"title\": ");
+        save->click();
+        QVERIFY(!error->isHidden());
+        QVERIFY(error->text().startsWith("Line 2"));
+        edit->setPlainText("{ \"httpPort\": 9000 }");
+        save->click();
+        QVERIFY(error->text().contains("httpPort"));
+        edit->setPlainText("{ \"title\": \"Test\", \"clients\": [\"3.5.20\"] }");
+        save->click();
+        QCOMPARE(dialog.result(), int(QDialog::Accepted));
+        QCOMPARE(ServerConfigDialog::current().value("title").toString(), QString("Test"));
+        QVERIFY(QFile::remove(QDir(Paths::serverData()).filePath("server.json")));
     }
 
     void cleanupTestCase()

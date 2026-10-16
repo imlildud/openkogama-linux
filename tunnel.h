@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QStringList>
 
+class QJsonObject;
 class QProcess;
 
 class Tunnel : public QObject
@@ -15,6 +16,7 @@ public:
     static QString address(const QString &code);
     static QString code(const QString &address);
     static QString display(const QString &code);
+    static QStringList clients(const QJsonObject &info);
 
     static Tunnel *host(const QString &secret, const QString &info, QObject *parent);
     static Tunnel *join(const QString &code, QObject *parent);

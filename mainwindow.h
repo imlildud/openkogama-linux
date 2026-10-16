@@ -13,6 +13,7 @@
 
 class WorldsDialog;
 class ShareBar;
+class QNetworkAccessManager;
 class ServersPage;
 class QProcess;
 
@@ -53,6 +54,8 @@ private:
     void joinServer(const QString &address);
     void joinCode(const QString &address);
     void updateHostVersion();
+    void editServerSettings();
+    void waitForServerToStop(int attempts);
     bool hasRemoteGames() const;
     bool startLocalServer(const QString &version, QProcess **server);
 
@@ -63,6 +66,7 @@ private:
 
     QPointer<WorldsDialog> m_worlds;
     ShareBar *m_share;
+    QNetworkAccessManager *m_net = nullptr;
     ServersPage *m_servers;
     QList<QPointer<QProcess>> m_remoteClients;
     QString m_activePath;

@@ -1,9 +1,11 @@
 #include "sharebar.h"
+#include "serverconfigdialog.h"
 #include "settings.h"
 #include "tunnel.h"
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QHBoxLayout>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
@@ -18,7 +20,7 @@ constexpr int Gap = 16;
 
 ShareBar::ShareBar(QWidget *parent)
     : QFrame(parent), m_text(new QLabel(this)), m_code(new QLabel(this)), m_info(new QLabel(this)),
-      m_copy(new QPushButton("Copy code", this)),
+      m_copy(new QPushButton("Copy code", this)), m_settings(new QPushButton("Server settings", this)),
       m_stop(new QPushButton(this)), m_slow(new QTimer(this))
 {
     setObjectName("shareBar");
@@ -35,12 +37,14 @@ ShareBar::ShareBar(QWidget *parent)
     m_code->setContentsMargins(Gap, 0, 0, 0);
     m_info->setContentsMargins(Gap, 0, 0, 0);
     m_copy->setObjectName("shareCopyButton");
+    m_settings->setObjectName("shareSettingsButton");
     m_stop->setObjectName("shareStopButton");
     layout->addWidget(m_text);
     layout->addWidget(m_code);
     layout->addWidget(m_info);
     layout->addStretch(1);
     layout->addWidget(m_copy);
+    layout->addWidget(m_settings);
     layout->addWidget(m_stop);
     m_slow->setSingleShot(true);
     m_slow->setInterval(SlowMs);
@@ -53,6 +57,7 @@ ShareBar::ShareBar(QWidget *parent)
         m_copy->setText("Copied");
         QTimer::singleShot(CopiedMs, m_copy, [this]() { m_copy->setText("Copy code"); });
     });
+    connect(m_settings, &QPushButton::clicked, this, &ShareBar::settingsRequested);
     connect(m_stop, &QPushButton::clicked, this, &ShareBar::stop);
     hide();
 }
@@ -82,6 +87,11 @@ void ShareBar::setVersion(const QString &version)
     if (version != m_version && m_tunnel) share(m_world, m_name, version);
 }
 
+void ShareBar::restart()
+{
+    if (m_tunnel) share(m_world, m_name, m_version);
+}
+
 void ShareBar::stop()
 {
     if (m_tunnel) {
@@ -99,9 +109,14 @@ void ShareBar::stop()
 
 void ShareBar::start()
 {
+    const QJsonObject config = ServerConfigDialog::current();
     const QString nickname = Settings::nickname();
-    const QJsonObject info{{"title", nickname.isEmpty() ? m_name : m_name + " (" + nickname + ")"},
-        {"version", m_version}, {"world", m_world}};
+    QString title = config.value("title").toString().trimmed();
+    if (title.isEmpty()) title = nickname.isEmpty() ? m_name : m_name + " (" + nickname + ")";
+    QJsonArray clients = config.value("clients").toArray();
+    if (clients.isEmpty() && !config.value("mixedClients").toBool()) clients.append(m_version);
+    const QJsonObject info{{"title", title}, {"version", clients.size() == 1 ? clients.first().toString() : QString()},
+        {"clients", clients}, {"world", m_world}};
     Tunnel *tunnel = Tunnel::host(Settings::hostSecret(), QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact)), this);
     m_tunnel = tunnel;
     connect(tunnel, &Tunnel::said, this, [this, tunnel](const QString &word, const QString &rest) {
@@ -152,5 +167,6 @@ void ShareBar::refresh()
     m_info->setVisible(!failed);
     m_copy->setVisible(live);
     m_stop->setText(m_tunnel ? "Stop hosting" : "Close");
-    setToolTip(m_version.isEmpty() ? QString() : "Players need KoGaMa " + m_version + " and type the code in Servers, Join with code");
+    m_settings->setVisible(!failed);
+    setToolTip("Players type the code in Servers, Join with code");
 }

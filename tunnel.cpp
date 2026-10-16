@@ -3,6 +3,8 @@
 #include "settings.h"
 #include <QCoreApplication>
 #include <QDir>
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QProcess>
 
 namespace {
@@ -40,6 +42,19 @@ QString Tunnel::code(const QString &address)
 QString Tunnel::display(const QString &code)
 {
     return code.left(3) + "-" + code.mid(3);
+}
+
+QStringList Tunnel::clients(const QJsonObject &info)
+{
+    QStringList clients;
+    const QJsonArray listed = info.value("clients").toArray();
+    for (const QJsonValue &value : listed) {
+        const QString client = value.toString().trimmed().left(64);
+        if (!client.isEmpty()) clients.append(client);
+    }
+    const QString version = info.value("version").toString().trimmed().left(64);
+    if (!info.contains("clients") && !version.isEmpty()) clients.append(version);
+    return clients;
 }
 
 Tunnel *Tunnel::host(const QString &secret, const QString &info, QObject *parent)

@@ -10,6 +10,7 @@
 #include "gamelauncher.h"
 #include "settings.h"
 #include "creditsdialog.h"
+#include "serverconfigdialog.h"
 #include "sharebar.h"
 #include "tunnel.h"
 #include "paths.h"
@@ -139,6 +140,11 @@ MainWindow::MainWindow(QWidget *parent)
         QDesktopServices::openUrl(QUrl("https://github.com/openkogama/openkogama-server/blob/main/HOSTING.md"));
     });
     ui->menuHelp->insertAction(ui->actionCredits, guide);
+    auto *serverSettings = new QAction("Server settings...", this);
+    connect(serverSettings, &QAction::triggered, this, &MainWindow::editServerSettings);
+    ui->menuFile->addAction(serverSettings);
+    connect(m_share, &ShareBar::settingsRequested, this, &MainWindow::editServerSettings);
+    m_net = new QNetworkAccessManager(this);
     ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
     connect(ui->actionInstall, &QAction::triggered, this, &MainWindow::onInstallTriggered);
     connect(ui->actionDiscord, &QAction::triggered, this, &MainWindow::onDiscordTriggered);
@@ -636,6 +642,36 @@ void MainWindow::joinServer(const QString &address) {
     updateInstanceActions();
 }
 
+void MainWindow::editServerSettings() {
+    ServerConfigDialog dialog(this);
+    if (dialog.exec() != QDialog::Accepted || !m_localReady || !m_worlds) return;
+    if ((m_worlds->hasRunningGames() || hasRemoteGames())
+        && QMessageBox::question(this, "Server settings", "Restart the server now? Games on it get disconnected. "
+            "Otherwise the settings apply the next time it starts.") != QMessageBox::Yes)
+        return;
+    m_net->get(QNetworkRequest(QUrl(LocalServerUrl + "/shutdown")));
+    QTimer::singleShot(300, this, [this]() { waitForServerToStop(50); });
+}
+
+void MainWindow::waitForServerToStop(int attempts) {
+    QNetworkRequest ping(QUrl(LocalServerUrl + "/ping"));
+    ping.setTransferTimeout(300);
+    QNetworkReply *reply = m_net->get(ping);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, attempts]() {
+        reply->deleteLater();
+        if (reply->error() == QNetworkReply::NoError && attempts > 0) {
+            QTimer::singleShot(200, this, [this, attempts]() { waitForServerToStop(attempts - 1); });
+            return;
+        }
+        QProcess *server = nullptr;
+        QString exe;
+        if (!m_worlds || !startLocalServer(AssetInstaller::versionOf(m_activePath), &server) || !prepareInstance(m_activePath, &exe))
+            return;
+        m_worlds->setInstance(m_activePath, exe, server);
+        m_share->restart();
+    });
+}
+
 void MainWindow::updateHostVersion() {
     m_share->setVersion(clientVersion(instances->item(ui->versionCombo->currentIndex())));
 }
@@ -676,7 +712,7 @@ void MainWindow::joinCode(const QString &address) {
         progress->disconnect(this);
         progress->close();
     };
-    auto launch = [this, trip, tunnel, dismiss]() {
+    auto launch = [this, address, trip, tunnel, dismiss]() {
         if (trip->launched || trip->path.isEmpty() || trip->port == 0) return;
         dismiss();
         QProcess *client = GameLauncher::start(trip->path, trip->exe, "http://127.0.0.1:" + QString::number(trip->port), "play", trip->world, this, this);
@@ -685,6 +721,7 @@ void MainWindow::joinCode(const QString &address) {
             return;
         }
         trip->launched = true;
+        m_servers->probeThrough(address, "http://127.0.0.1:" + QString::number(trip->port));
         client->setProperty("instancePath", trip->path);
         m_remoteClients.append(client);
         connect(client, &QProcess::finished, this, [this, client, tunnel]() {
@@ -713,8 +750,7 @@ void MainWindow::joinCode(const QString &address) {
         } else if (word == "found") {
             const QJsonObject info = QJsonDocument::fromJson(rest.toUtf8()).object();
             m_servers->showFound(address, info);
-            const QString version = info.value("version").toString();
-            const GameServer host{QString(), address, QString(), {}, version.isEmpty() ? QStringList() : QStringList{version}};
+            const GameServer host{QString(), address, QString(), {}, Tunnel::clients(info)};
             int row = ui->versionCombo->currentIndex();
             if (!host.accepts(clientVersion(instances->item(row)))) {
                 row = -1;
@@ -722,7 +758,7 @@ void MainWindow::joinCode(const QString &address) {
                     if (host.accepts(clientVersion(instances->item(candidate)))) row = candidate;
             }
             if (row < 0 || clientVersion(instances->item(row)) == "2012") {
-                trip->error = row < 0 ? "This world needs KoGaMa " + version + ". Add that version first."
+                trip->error = row < 0 ? "This world needs KoGaMa " + host.clients.join(", ") + ". Add one of these versions first."
                     : "KoGaMa 2012 can't join with a code yet.";
                 if (tunnel) tunnel->stop();
                 return;
