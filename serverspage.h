@@ -28,7 +28,7 @@ public:
     void setCanJoin(bool enabled);
     bool canJoin() const { return m_canJoin; }
     void showFound(const QString &address, const QJsonObject &info);
-    void probeThrough(const QString &address, const QString &base);
+    void probeThrough(const QString &address, const QString &base, int world = 0);
     bool isPublic(const QString &address) const;
     QString titleOf(const QString &address) const;
     QStringList clientsOf(const QString &address) const;
@@ -61,7 +61,7 @@ private:
     void resolve(QStringList candidates, std::function<void(const QString &)> done);
     void keepServer(const QString &address, const QString &name);
     void saveServer();
-    void fetchThumbnail(const QString &address, const QString &base);
+    void fetchThumbnail(const QString &address, const QString &url);
     void setStatus(const QString &address, const QString &status);
     void updateActions();
     void filter();

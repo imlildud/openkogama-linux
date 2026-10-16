@@ -30,6 +30,8 @@ private:
     void heard(const QString &word, const QString &rest);
     void ended();
     void refresh();
+    void sendThumbnail(int tries);
+    static QByteArray smallJpeg(const QByteArray &bytes);
 
     QLabel *m_text;
     QLabel *m_code;
@@ -38,6 +40,7 @@ private:
     QPushButton *m_settings;
     QPushButton *m_stop;
     QTimer *m_slow;
+    QTimer *m_upload;
     QNetworkAccessManager *m_net = nullptr;
     QPointer<Tunnel> m_tunnel;
     QString m_name;

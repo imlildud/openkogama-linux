@@ -142,7 +142,7 @@ private slots:
         MockServer server;
         server.metadata = QJsonDocument(QJsonObject{{"title", QString(80, 'A')},
             {"thumbnail", "/api/server/thumbnail"}, {"worlds", "ignored"}}).toJson();
-        server.image = QByteArray(256 * 1024 + 1, 'X');
+        server.image = QByteArray(2 * 1024 * 1024 + 1, 'X');
         Settings::setServers({{"Saved", server.url(), {}, {}}});
         ServersPage page;
         auto *list = page.findChild<QListWidget *>("serversList");

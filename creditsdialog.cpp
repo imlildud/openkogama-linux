@@ -19,6 +19,9 @@ const Credit Thanks[] = {
     {"LazyLemon", "Info on how things looked in old versions, and help with the launcher."},
     {"bustersky", "Archiving the standalone builds."},
     {"kamilslimak", "Finding the 2012 build."},
+    {"Dylinn", "Announcing OpenKogama on Regama."},
+    {"Zpayer", "Announcing OpenKogama, and pointing kogama.cloud here."},
+    {"loafio", "Sharing OpenKogama on his server."},
 };
 
 QFont brandFont(int pointSize)

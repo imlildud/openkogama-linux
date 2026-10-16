@@ -243,10 +243,10 @@ void WorldsDialog::loadWorlds(int select) {
         ui->worldStatusLabel->setText("Loading your worlds...");
         ui->worldStatusLabel->show();
     }
-    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(m_url + "/api/worlds")));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, select, url = m_url]() {
+    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(LocalServerUrl + "/api/worlds")));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, select, url = LocalServerUrl]() {
         reply->deleteLater();
-        if (url != m_url) return;
+        if (url != LocalServerUrl) return;
         if (reply->error() != QNetworkReply::NoError) {
             ui->worldStatusLabel->setText("Could not load your worlds. Press F5 to try again.");
             ui->worldStatusLabel->show();
@@ -298,7 +298,7 @@ void WorldsDialog::loadWorlds(int select) {
 }
 
 void WorldsDialog::checkRevision() {
-    QNetworkRequest request(QUrl(m_url + "/api/worlds/revision"));
+    QNetworkRequest request(QUrl(LocalServerUrl + "/api/worlds/revision"));
     request.setTransferTimeout(500);
     QNetworkReply *reply = m_net->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -316,7 +316,7 @@ void WorldsDialog::checkRevision() {
 
 void WorldsDialog::loadThumbnail(QListWidgetItem *item, int world) {
     QPointer<QListWidget> list = ui->worldsList;
-    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(m_url + "/images/0/" + QString::number(world) + ".png?v=" + QString::number(m_revision))));
+    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(LocalServerUrl + "/images/0/" + QString::number(world) + ".png?v=" + QString::number(m_revision))));
     connect(reply, &QNetworkReply::finished, this, [reply, list, item, world]() {
         reply->deleteLater();
         QByteArray data = reply->readAll();
@@ -340,7 +340,7 @@ bool WorldsDialog::eventFilter(QObject *watched, QEvent *event) {
 }
 
 void WorldsDialog::loadTemplates() {
-    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(m_url + "/api/templates")));
+    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(LocalServerUrl + "/api/templates")));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         m_templates.clear();
@@ -383,7 +383,7 @@ void WorldsDialog::createWorld() {
 
     if (dialog.exec() != QDialog::Accepted || name->text().trimmed().isEmpty()) return;
 
-    QUrl url(m_url + "/api/worlds");
+    QUrl url(LocalServerUrl + "/api/worlds");
     QUrlQuery query;
     query.addQueryItem("name", name->text().trimmed());
     if (templates->currentIndex() >= 0)
@@ -409,7 +409,7 @@ void WorldsDialog::importWorld() {
         return;
     }
 
-    QUrl url(m_url + "/api/worlds/import");
+    QUrl url(LocalServerUrl + "/api/worlds/import");
     QUrlQuery query;
     query.addQueryItem("name", QFileInfo(path).completeBaseName());
     QFile meta(QDir(m_path).filePath("instance.json"));
@@ -460,7 +460,7 @@ void WorldsDialog::downloadArchiveThumbnail(int world, const QUrl &url) {
         QBuffer buffer(&png);
         if (reply->error() != QNetworkReply::NoError || !image.loadFromData(reply->readAll())
             || !buffer.open(QIODevice::WriteOnly) || !image.save(&buffer, "PNG")) return;
-        QNetworkRequest request(QUrl(m_url + "/api/worlds/thumbnail?id=" + QString::number(world)));
+        QNetworkRequest request(QUrl(LocalServerUrl + "/api/worlds/thumbnail?id=" + QString::number(world)));
         request.setHeader(QNetworkRequest::ContentTypeHeader, "image/png");
         QNetworkReply *upload = m_net->post(request, png);
         connect(upload, &QNetworkReply::finished, upload, &QObject::deleteLater);
@@ -476,7 +476,7 @@ void WorldsDialog::exportWorld() {
     QString path = QFileDialog::getSaveFileName(this, "Export World", name + ".kgmap", "KoGaMa maps (*.kgmap)");
     if (path.isEmpty()) return;
 
-    QUrl url(m_url + "/api/worlds/export");
+    QUrl url(LocalServerUrl + "/api/worlds/export");
     QUrlQuery query;
     query.addQueryItem("id", QString::number(item->data(Qt::UserRole).toInt()));
     url.setQuery(query);
@@ -508,7 +508,7 @@ void WorldsDialog::onWorldRenamed(QListWidgetItem *item) {
     item->setData(NameRole, name);
     updateWorldActions();
     int id = item->data(Qt::UserRole).toInt();
-    QUrl url(m_url + "/api/worlds/rename");
+    QUrl url(LocalServerUrl + "/api/worlds/rename");
     QUrlQuery query;
     query.addQueryItem("id", QString::number(id));
     query.addQueryItem("name", name);
@@ -535,7 +535,7 @@ void WorldsDialog::deleteWorld() {
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (answer != QMessageBox::Yes) return;
 
-    QUrl url(m_url + "/api/worlds/delete");
+    QUrl url(LocalServerUrl + "/api/worlds/delete");
     QUrlQuery query;
     query.addQueryItem("id", QString::number(item->data(Qt::UserRole).toInt()));
     url.setQuery(query);
@@ -577,10 +577,10 @@ void WorldsDialog::loadAvatars(int select) {
         ui->avatarStatusLabel->setText("Loading your avatars...");
         ui->avatarStatusLabel->show();
     }
-    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(m_url + "/api/avatars")));
-    connect(reply, &QNetworkReply::finished, this, [this, reply, select, url = m_url]() {
+    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(LocalServerUrl + "/api/avatars")));
+    connect(reply, &QNetworkReply::finished, this, [this, reply, select, url = LocalServerUrl]() {
         reply->deleteLater();
-        if (url != m_url) return;
+        if (url != LocalServerUrl) return;
         if (reply->error() != QNetworkReply::NoError) {
             ui->avatarStatusLabel->setText("Could not load your avatars. Press F5 to try again.");
             ui->avatarStatusLabel->show();
@@ -637,7 +637,7 @@ void WorldsDialog::loadAvatars(int select) {
 
 void WorldsDialog::loadAvatarPicture(QListWidgetItem *item, int avatar, const QString &version) {
     QPointer<QListWidget> list = ui->avatarsList;
-    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(m_url + "/images/1/" + QString::number(avatar) + ".png?v=" + version)));
+    QNetworkReply *reply = m_net->get(QNetworkRequest(QUrl(LocalServerUrl + "/images/1/" + QString::number(avatar) + ".png?v=" + version)));
     connect(reply, &QNetworkReply::finished, this, [reply, list, item, avatar]() {
         reply->deleteLater();
         QByteArray data = reply->readAll();
@@ -667,7 +667,7 @@ void WorldsDialog::editAvatar() {
 }
 
 void WorldsDialog::activateAvatar(int avatar, std::function<void()> done) {
-    QUrl url(m_url + "/api/avatars/active");
+    QUrl url(LocalServerUrl + "/api/avatars/active");
     QUrlQuery query;
     query.addQueryItem("id", QString::number(avatar));
     url.setQuery(query);
@@ -695,7 +695,7 @@ void WorldsDialog::importAvatar() {
         return;
     }
 
-    QNetworkRequest request(QUrl(m_url + "/api/avatars/import"));
+    QNetworkRequest request(QUrl(LocalServerUrl + "/api/avatars/import"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
     QNetworkReply *reply = m_net->post(request, file.readAll());
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
@@ -713,7 +713,7 @@ void WorldsDialog::exportAvatar() {
     QString path = QFileDialog::getSaveFileName(this, "Export Avatar", ui->avatarsList->currentItem()->text() + ".kgavatar", "KoGaMa avatars (*.kgavatar)");
     if (path.isEmpty()) return;
 
-    QUrl url(m_url + "/api/avatars/export");
+    QUrl url(LocalServerUrl + "/api/avatars/export");
     QUrlQuery query;
     query.addQueryItem("id", QString::number(avatar));
     url.setQuery(query);
@@ -745,7 +745,7 @@ void WorldsDialog::onAvatarRenamed(QListWidgetItem *item) {
     item->setData(NameRole, name);
     updateAvatarActions();
     int id = item->data(Qt::UserRole).toInt();
-    QUrl url(m_url + "/api/avatars/rename");
+    QUrl url(LocalServerUrl + "/api/avatars/rename");
     QUrlQuery query;
     query.addQueryItem("id", QString::number(id));
     query.addQueryItem("name", name);

@@ -54,6 +54,7 @@ private:
     bool prepareInstance(const QString &path, QString *executable);
     void joinServer(const QString &address);
     void joinCode(const QString &address);
+    void offerVersion(const QStringList &clients, const QString &title, std::function<void()> then);
     void updateHostVersion();
     void editServerSettings();
     void waitForServerToStop(int attempts);

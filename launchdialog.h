@@ -3,11 +3,11 @@
 
 #include <QDialog>
 #include <QNetworkAccessManager>
+#include <QPointer>
 #include <QProcess>
+#include "paths.h"
 
 class AssetInstaller;
-
-inline const QString LocalServerUrl = "http://127.0.0.1:8080";
 
 namespace Ui {
 class LaunchDialog;
@@ -31,15 +31,18 @@ private:
     void checkServer();
     void startServer();
     void waitForServer(int attempts);
+    void failed();
     void fail(const QString &message);
     void setStep(const QString &status, int progress);
 
     Ui::LaunchDialog *ui;
     QNetworkAccessManager *m_net;
-    QProcess *m_server = nullptr;
+    QPointer<QProcess> m_server;
     AssetInstaller *m_assets;
+    int m_exitCode = 0;
     bool m_offline = false;
     bool m_cancelled = false;
+    bool m_retried = false;
 };
 
 #endif // LAUNCHDIALOG_H

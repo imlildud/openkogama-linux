@@ -1,13 +1,51 @@
 #include "updater.h"
+#include "launchdialog.h"
 #include <QApplication>
+#include <QDeadlineTimer>
+#include <QEventLoop>
+#include <QFileInfo>
 #include <QFutureWatcher>
 #include <QMessageBox>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QProcess>
 #include <QtConcurrent>
 #include <Velopack.hpp>
 
 namespace {
 
 const std::string Repository = "https://github.com/openkogama/openkogama-launcher";
+constexpr int ShutdownMs = 2000;
+constexpr int SaveMs = 4000;
+constexpr int KillMs = 3000;
+
+bool isLocalServer(const QProcess *process)
+{
+    const QString first = process->arguments().value(0);
+    return QFileInfo(process->program()).fileName() == "openkogama-server.exe" && first != "tunnel" && first != "install";
+}
+
+void stopChildren(QWidget *window)
+{
+    QNetworkAccessManager net;
+    QNetworkRequest request(QUrl(LocalServerUrl + "/shutdown"));
+    request.setTransferTimeout(ShutdownMs);
+    QNetworkReply *reply = net.get(request);
+    QEventLoop loop;
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec();
+    reply->deleteLater();
+    const QList<QProcess *> processes = window->findChildren<QProcess *>();
+    QDeadlineTimer saving(SaveMs);
+    for (QProcess *process : processes)
+        if (process->state() != QProcess::NotRunning && isLocalServer(process))
+            process->waitForFinished(int(saving.remainingTime()));
+    for (QProcess *process : processes) {
+        if (process->state() == QProcess::NotRunning) continue;
+        process->kill();
+        process->waitForFinished(KillMs);
+    }
+}
 
 struct Update {
     std::shared_ptr<Velopack::UpdateManager> manager;
@@ -55,6 +93,7 @@ void Updater::check(QWidget *window) {
         if (QMessageBox::question(window, "Update", "OpenKogama Launcher " + version + " is ready. Restart now to update?") != QMessageBox::Yes)
             return;
         try {
+            stopChildren(window);
             update.manager->WaitExitThenApplyUpdates(*update.info);
             QApplication::quit();
         } catch (const std::exception &error) {

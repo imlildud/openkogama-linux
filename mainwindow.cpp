@@ -57,6 +57,7 @@
 #include <QProgressDialog>
 #include <algorithm>
 #include <memory>
+#include <optional>
 
 static constexpr int NameRole = Qt::UserRole + 1;
 static constexpr int VersionRole = Qt::UserRole + 2;
@@ -312,7 +313,7 @@ void MainWindow::updatePlayPage() {
     ui->welcomeDescription->setText(installed ? "Open your worlds to play, build or create something new." : "Add a game version, then choose a world to play or build.");
     ui->openWorldsButton->setVisible(installed);
     ui->firstVersionButton->setVisible(!installed);
-    m_servers->setCanJoin(installed);
+    m_servers->setCanJoin(true);
 }
 
 void MainWindow::onVersionChanged() {
@@ -553,10 +554,7 @@ bool MainWindow::prepareInstance(const QString &path, QString *executable) {
 }
 
 bool MainWindow::launchInstance(const QString &path) {
-    if (m_worlds && path == m_activePath) {
-        ui->mainTabs->setCurrentWidget(ui->playTab);
-        return true;
-    }
+    if (m_worlds && path == m_activePath) return true;
     if ((m_worlds && m_worlds->hasRunningGames()) || hasRemoteGames()) {
         QMessageBox::information(this, "Change version", "Close the game before changing its version.");
         return false;
@@ -624,12 +622,13 @@ void MainWindow::joinServer(const QString &address) {
         return;
     }
     const GameServer server{QString(), address, QString(), {}, m_servers->clientsOf(address)};
-    if (!server.accepts(clientVersion(instances->item(ui->versionCombo->currentIndex())))) {
+    const int current = ui->versionCombo->currentIndex();
+    if (current < 0 || !server.accepts(clientVersion(instances->item(current)))) {
         int match = -1;
         for (int row = instances->rowCount() - 1; row >= 0 && match < 0; --row)
             if (server.accepts(clientVersion(instances->item(row)))) match = row;
         if (match < 0) {
-            QMessageBox::information(this, "Join", "This server accepts " + server.clients.join(", ") + ". Add one of these versions first.");
+            offerVersion(server.clients, m_servers->titleOf(address), [this, address]() { joinServer(address); });
             return;
         }
         ui->versionCombo->setCurrentIndex(match);
@@ -654,6 +653,31 @@ void MainWindow::joinServer(const QString &address) {
     updateInstanceActions();
 }
 
+void MainWindow::offerVersion(const QStringList &clients, const QString &title, std::function<void()> then) {
+    if (m_installing) return;
+    const GameServer wanted{QString(), QString(), QString(), {}, clients};
+    std::optional<Version> best;
+    for (const Version &version : InstallDialog::parse(m_versionsJson))
+        if (wanted.accepts(version.version)
+            && (!best || QVersionNumber::fromString(version.version) > QVersionNumber::fromString(best->version)))
+            best = version;
+    const QString server = title.isEmpty() ? QString("This server") : title;
+    if (!best) {
+        QMessageBox::information(this, "Join", server + " plays KoGaMa " + clients.join(", ") + ". Add it on the Versions tab first.");
+        return;
+    }
+    if (QMessageBox::question(this, "Join", server + " plays KoGaMa " + best->version + ", which you don't have yet. Download it now ("
+            + best->download + ")?") != QMessageBox::Yes)
+        return;
+    m_installing = true;
+    InstallProgressDialog progress(*best, best->version, this);
+    const bool installed = progress.exec() == QDialog::Accepted;
+    m_installing = false;
+    if (!installed) return;
+    loadInstances(progress.installedPath());
+    then();
+}
+
 void MainWindow::openLink(const QString &link) {
     if (isMinimized()) showNormal();
     raise();
@@ -661,10 +685,6 @@ void MainWindow::openLink(const QString &link) {
     const QString address = Links::serverOf(link);
     if (address.isEmpty()) return;
     ui->mainTabs->setCurrentWidget(m_servers);
-    if (!m_servers->canJoin()) {
-        QMessageBox::information(this, "Join", "Add a game version first, then open the link again.");
-        return;
-    }
     const QString title = m_servers->titleOf(address);
     const QString shown = !title.isEmpty() ? title
         : Tunnel::isAddress(address) ? Tunnel::display(Tunnel::code(address)) : QUrl(address).host();
@@ -722,10 +742,13 @@ void MainWindow::joinCode(const QString &address) {
         QString path;
         QString exe;
         QString error;
+        QString title;
+        QStringList needs;
         int world = 0;
         int port = 0;
         bool cancelled = false;
         bool launched = false;
+        bool missing = false;
     };
     const QString code = Tunnel::code(address);
     auto trip = std::make_shared<Trip>();
@@ -755,7 +778,7 @@ void MainWindow::joinCode(const QString &address) {
             DiscordPresence::join(client, address, m_servers->titleOf(address));
             m_servers->reportPlaying(client, address);
         }
-        m_servers->probeThrough(address, "http://127.0.0.1:" + QString::number(trip->port));
+        m_servers->probeThrough(address, "http://127.0.0.1:" + QString::number(trip->port), trip->world);
         client->setProperty("instancePath", trip->path);
         m_remoteClients.append(client);
         connect(client, &QProcess::finished, this, [this, client, tunnel]() {
@@ -786,13 +809,15 @@ void MainWindow::joinCode(const QString &address) {
             m_servers->showFound(address, info);
             const GameServer host{QString(), address, QString(), {}, Tunnel::clients(info)};
             int row = ui->versionCombo->currentIndex();
-            if (!host.accepts(clientVersion(instances->item(row)))) {
+            if (row < 0 || !host.accepts(clientVersion(instances->item(row)))) {
                 row = -1;
                 for (int candidate = instances->rowCount() - 1; candidate >= 0 && row < 0; --candidate)
                     if (host.accepts(clientVersion(instances->item(candidate)))) row = candidate;
             }
             if (row < 0) {
-                trip->error = "This world needs KoGaMa " + host.clients.join(", ") + ". Add one of these versions first.";
+                trip->missing = true;
+                trip->needs = host.clients;
+                trip->title = info.value("title").toString().trimmed();
                 if (tunnel) tunnel->stop();
                 return;
             }
@@ -810,10 +835,12 @@ void MainWindow::joinCode(const QString &address) {
             launch();
         }
     });
-    connect(tunnel, &Tunnel::ended, this, [this, trip, tunnel, dismiss]() {
+    connect(tunnel, &Tunnel::ended, this, [this, address, trip, tunnel, dismiss]() {
         dismiss();
-        if (!trip->launched && !trip->cancelled)
-            QMessageBox::information(this, "Join", trip->error.isEmpty() ? "Could not connect to the host." : trip->error);
         if (tunnel) tunnel->deleteLater();
+        if (trip->missing)
+            offerVersion(trip->needs, trip->title, [this, address]() { joinCode(address); });
+        else if (!trip->launched && !trip->cancelled)
+            QMessageBox::information(this, "Join", trip->error.isEmpty() ? "Could not connect to the host." : trip->error);
     });
 }

@@ -57,6 +57,8 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
     const QString nickname = Settings::nickname();
     if (!nickname.isEmpty())
         session += "&name=" + QString::fromLatin1(QUrl::toPercentEncoding(nickname));
+    if (viaCode)
+        session += "&local=" + QString::number(LocalHttpPort);
 
     auto *client = new QProcess(owner);
     QDir logs(QDir(path).filePath("logs"));

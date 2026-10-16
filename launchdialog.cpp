@@ -4,19 +4,74 @@
 #include "ui_launchdialog.h"
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QFile>
 #include <QIcon>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QNetworkReply>
+#include <QTcpServer>
 #include <QTimer>
+#include <QUdpSocket>
 
 static constexpr unsigned long CreateNoWindow = 0x08000000;
 static constexpr int PingAttempts = 200;
 static constexpr int PingTimeout = 150;
 static constexpr int AssetsEnd = 50;
+static constexpr int DefaultHttpPort = 8080;
+static constexpr int DefaultPhotonPort = 5055;
+static constexpr int PortBusy = 3;
+static constexpr int PortTries = 20;
+static constexpr qint64 LogTail = 8192;
 
-static QNetworkRequest pingRequest() {
-    QNetworkRequest request(QUrl(LocalServerUrl + "/ping"));
+static QNetworkRequest pingRequest(const QString &path = "/ping") {
+    QNetworkRequest request(QUrl(LocalServerUrl + path));
     request.setTransferTimeout(PingTimeout);
     return request;
+}
+
+static bool tcpFree(int port) {
+    QTcpServer probe;
+    return probe.listen(QHostAddress::Any, port);
+}
+
+static bool udpFree(int port) {
+    QUdpSocket probe;
+    return probe.bind(QHostAddress::Any, port, QAbstractSocket::DontShareAddress);
+}
+
+static int freePort(bool udp) {
+    for (int attempt = 0; attempt < PortTries; ++attempt) {
+        QTcpServer probe;
+        if (!probe.listen(QHostAddress::Any, 0)) continue;
+        const int port = probe.serverPort();
+        probe.close();
+        if (!udp || udpFree(port)) return port;
+    }
+    return 0;
+}
+
+static void choosePorts(bool fresh) {
+    const int http = !fresh && tcpFree(DefaultHttpPort) ? DefaultHttpPort : freePort(false);
+    int photon = !fresh && tcpFree(DefaultPhotonPort) && udpFree(DefaultPhotonPort) ? DefaultPhotonPort : freePort(true);
+    if (photon == http) photon = freePort(true);
+    if (http > 0) LocalHttpPort = http;
+    if (photon > 0) LocalPhotonPort = photon;
+    LocalServerUrl = "http://127.0.0.1:" + QString::number(LocalHttpPort);
+}
+
+static QString lastServerError() {
+    QDir logs(Paths::serverData() + "/logs");
+    const QStringList files = logs.entryList({"server-*.log"}, QDir::Files, QDir::Time);
+    if (files.isEmpty()) return {};
+    QFile file(logs.filePath(files.first()));
+    if (!file.open(QIODevice::ReadOnly)) return {};
+    file.seek(qMax<qint64>(0, file.size() - LogTail));
+    const QStringList lines = QString::fromUtf8(file.readAll()).split('\n');
+    for (auto line = lines.crbegin(); line != lines.crend(); ++line) {
+        const qsizetype at = line->indexOf(" error ");
+        if (at >= 0) return line->mid(at + 7).trimmed();
+    }
+    return {};
 }
 
 LaunchDialog::LaunchDialog(const QString &version, QWidget *parent)
@@ -30,6 +85,7 @@ LaunchDialog::LaunchDialog(const QString &version, QWidget *parent)
     setWindowTitle("Starting server");
     ui->nameLabel->setText("Starting OpenKogama server");
     ui->progressBar->setRange(0, 100);
+    ui->statusLabel->setWordWrap(true);
 
     connect(m_assets, &AssetInstaller::progress, this, [this](qint64 done, qint64 total) {
         if (total > 0) setStep("Checking game assets...", int(done * AssetsEnd / total));
@@ -45,11 +101,12 @@ LaunchDialog::LaunchDialog(const QString &version, QWidget *parent)
 
 void LaunchDialog::checkServer() {
     setStep("Checking server...", AssetsEnd);
-    QNetworkReply *reply = m_net->get(pingRequest());
+    QNetworkReply *reply = m_net->get(pingRequest("/api/server"));
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (m_cancelled) return;
-        if (reply->error() == QNetworkReply::NoError)
+        const QJsonObject server = QJsonDocument::fromJson(reply->readAll()).object();
+        if (reply->error() == QNetworkReply::NoError && server.contains("title"))
             accept();
         else
             startServer();
@@ -80,13 +137,18 @@ void LaunchDialog::startServer() {
 
     setStep("Starting server...", AssetsEnd + 5);
     QDir().mkpath(Paths::serverData());
+    choosePorts(m_retried);
+    QStringList arguments{"--http", QString::number(LocalHttpPort), "--photon", QString::number(LocalPhotonPort)};
+    if (m_offline) arguments.append("--offline");
+    m_exitCode = 0;
     m_server = new QProcess(parentWidget());
     m_server->setProgram(dir.filePath("openkogama-server.exe"));
     m_server->setWorkingDirectory(Paths::serverData());
-    if (m_offline) m_server->setArguments({"--offline"});
+    m_server->setArguments(arguments);
     m_server->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;
     });
+    connect(m_server, &QProcess::finished, this, [this](int exitCode) { m_exitCode = exitCode; });
     connect(m_server, &QProcess::finished, m_server, &QObject::deleteLater);
     m_server->start();
 
@@ -95,10 +157,8 @@ void LaunchDialog::startServer() {
 
 void LaunchDialog::waitForServer(int attempts) {
     if (m_cancelled) return;
-    if (m_server->state() == QProcess::NotRunning || attempts == 0) {
-        m_server->kill();
-        m_server = nullptr;
-        fail("Server did not start");
+    if (!m_server || m_server->state() == QProcess::NotRunning || attempts == 0) {
+        failed();
         return;
     }
 
@@ -112,6 +172,19 @@ void LaunchDialog::waitForServer(int attempts) {
         else
             QTimer::singleShot(50, this, [this, attempts]() { waitForServer(attempts - 1); });
     });
+}
+
+void LaunchDialog::failed() {
+    const bool running = m_server && m_server->state() != QProcess::NotRunning;
+    if (m_server) m_server->kill();
+    m_server = nullptr;
+    if (!running && m_exitCode == PortBusy && !m_retried) {
+        m_retried = true;
+        startServer();
+        return;
+    }
+    const QString reason = lastServerError();
+    fail(reason.isEmpty() ? QString("Server did not start") : "Server did not start: " + reason);
 }
 
 void LaunchDialog::fail(const QString &message) {

@@ -108,7 +108,7 @@ void ServerConfigDialog::save()
         problem = "The settings have to be one { } object.";
     for (const QString &key : Fixed)
         if (problem.isEmpty() && document.object().contains(key))
-            problem = "Leave out " + key + ", the launcher reaches this server on 127.0.0.1:8080.";
+            problem = "Leave out " + key + ", the launcher picks the ports and address of this server itself.";
     if (!problem.isEmpty()) {
         m_error->setText(problem);
         m_error->show();

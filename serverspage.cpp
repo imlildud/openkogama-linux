@@ -42,6 +42,7 @@ constexpr int TitleRole = Qt::UserRole + 1;
 constexpr int StatusRole = Qt::UserRole + 2;
 constexpr int ClientsRole = Qt::UserRole + 3;
 constexpr qint64 ThumbnailLimit = 256 * 1024;
+constexpr qint64 DownloadLimit = 2 * 1024 * 1024;
 constexpr qint64 ListLimit = 256 * 1024;
 constexpr int PublicLimit = 200;
 constexpr int ClientsLimit = 10;
@@ -107,7 +108,7 @@ QIcon imageTile(const QByteArray &bytes, const QColor &background)
 
 QByteArray normalizedThumbnail(QByteArray bytes)
 {
-    if (bytes.isEmpty() || bytes.size() > ThumbnailLimit) return {};
+    if (bytes.isEmpty() || bytes.size() > DownloadLimit) return {};
     QBuffer input(&bytes);
     input.open(QIODevice::ReadOnly);
     QImageReader reader(&input);
@@ -425,7 +426,7 @@ void ServersPage::fetchPublic()
             if (address.isEmpty() || std::any_of(servers.cbegin(), servers.cend(), [&](const PublicServer &s) { return s.address == address; }))
                 continue;
             PublicServer server{address, titleText(entry.value("title").toString()), {},
-                std::clamp(entry.value("players").toInt(), 0, 999), entry.value("thumbnail").toBool() && !Tunnel::isAddress(address)};
+                std::clamp(entry.value("players").toInt(), 0, 999), entry.value("thumbnail").toBool()};
             for (const QJsonValue &client : entry.value("clients").toArray()) {
                 const QString text = client.toString().trimmed().left(64);
                 if (!text.isEmpty() && server.clients.size() < ClientsLimit) server.clients.append(text);
@@ -443,7 +444,9 @@ void ServersPage::fetchPublic()
         for (const PublicServer &server : std::as_const(m_public)) {
             if (!server.thumbnail || m_thumbnails.contains(server.address)) continue;
             m_thumbnails.insert(server.address, {});
-            fetchThumbnail(server.address, server.address);
+            fetchThumbnail(server.address, Tunnel::isAddress(server.address)
+                ? Settings::publicList() + "/thumbnail?address=" + QString::fromLatin1(QUrl::toPercentEncoding(server.address))
+                : server.address + "/api/server/thumbnail");
         }
     });
 }
@@ -532,7 +535,7 @@ void ServersPage::probe(const QString &address)
         }
         setStatus(address, "Online");
         filter();
-        if (document.object().value("thumbnail").toString() == "/api/server/thumbnail") fetchThumbnail(address, address);
+        if (document.object().value("thumbnail").toString() == "/api/server/thumbnail") fetchThumbnail(address, address + "/api/server/thumbnail");
     });
 }
 
@@ -576,17 +579,18 @@ void ServersPage::showFound(const QString &address, const QJsonObject &info)
     filter();
 }
 
-void ServersPage::probeThrough(const QString &address, const QString &base)
+void ServersPage::probeThrough(const QString &address, const QString &base, int world)
 {
-    get(base + "/api/server", 4096, [this, address, base](int status, const QByteArray &data) {
-        if (status == 200 && QJsonDocument::fromJson(data).object().value("thumbnail").toString() == "/api/server/thumbnail")
-            fetchThumbnail(address, base);
+    const QString query = world > 0 ? "?world=" + QString::number(world) : QString();
+    get(base + "/api/server" + query, 4096, [this, address, base, query](int status, const QByteArray &data) {
+        if (status == 200 && QJsonDocument::fromJson(data).object().value("thumbnail").toString().startsWith("/api/server/thumbnail"))
+            fetchThumbnail(address, base + "/api/server/thumbnail" + query);
     });
 }
 
-void ServersPage::fetchThumbnail(const QString &address, const QString &base)
+void ServersPage::fetchThumbnail(const QString &address, const QString &url)
 {
-    get(base + "/api/server/thumbnail", ThumbnailLimit, [this, address](int status, const QByteArray &data) {
+    get(url, DownloadLimit, [this, address](int status, const QByteArray &data) {
         if (status != 200) return;
         const QByteArray thumbnail = normalizedThumbnail(data);
         if (thumbnail.isEmpty()) return;

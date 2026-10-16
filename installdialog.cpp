@@ -47,38 +47,43 @@ void InstallDialog::onVersionSelected(const QModelIndex &current, const QModelIn
     ui->versionNameLineEdit->setPlaceholderText(object.version);
 }
 
-void InstallDialog::populate(const QByteArray &data) {
+QList<Version> InstallDialog::parse(const QByteArray &data) {
+    QList<Version> parsed;
     QJsonParseError err;
     auto document = QJsonDocument::fromJson(data, &err);
-    if (err.error == QJsonParseError::NoError) {
+    if (err.error != QJsonParseError::NoError) return parsed;
 
-        const auto array = document.object().value("versions").toArray();
+    const auto array = document.object().value("versions").toArray();
 
-        for (const auto& entry : array) {
-            auto object = entry.toObject();
-            QString version = object.value("version").toString();
-            int timestamp = object.value("timestamp").toInt();
-            QString date = QDateTime::fromSecsSinceEpoch(timestamp).toString("dd/MM/yyyy");
-            QString unity = object.value("unityVersion").toString();
-            QString backend;
-            if (object.value("il2cpp").toBool()) backend = "IL2CPP";
-            else backend = "Mono";
-            qint64 zipSize = object.value("zipSize").toVariant().toLongLong();
-            QString download = QLocale().formattedDataSize(zipSize);
-            QString installed = QLocale().formattedDataSize(object.value("unpackedSize").toVariant().toLongLong());
-            QString sha256 = object.value("sha256").toString();
-            QString id = object.value("id").toString();
+    for (const auto& entry : array) {
+        auto object = entry.toObject();
+        QString version = object.value("version").toString();
+        int timestamp = object.value("timestamp").toInt();
+        QString date = QDateTime::fromSecsSinceEpoch(timestamp).toString("dd/MM/yyyy");
+        QString unity = object.value("unityVersion").toString();
+        QString backend;
+        if (object.value("il2cpp").toBool()) backend = "IL2CPP";
+        else backend = "Mono";
+        qint64 zipSize = object.value("zipSize").toVariant().toLongLong();
+        QString download = QLocale().formattedDataSize(zipSize);
+        QString installed = QLocale().formattedDataSize(object.value("unpackedSize").toVariant().toLongLong());
+        QString sha256 = object.value("sha256").toString();
+        QString id = object.value("id").toString();
 
-            QStringList urls;
-            for (const auto& u : object.value("urls").toArray())
-                urls.append(u.toString());
+        QStringList urls;
+        for (const auto& u : object.value("urls").toArray())
+            urls.append(u.toString());
 
-            versions.append({version, date, unity, backend, download, installed,
-                             sha256.left(7), urls, sha256, zipSize, id});
-
-            model->appendRow({new QStandardItem(version), new QStandardItem(date)});
-        }
+        parsed.append({version, date, unity, backend, download, installed,
+                       sha256.left(7), urls, sha256, zipSize, id});
     }
+    return parsed;
+}
+
+void InstallDialog::populate(const QByteArray &data) {
+    versions = parse(data);
+    for (const Version &version : std::as_const(versions))
+        model->appendRow({new QStandardItem(version.version), new QStandardItem(version.date)});
     ui->versionsTreeView->setCurrentIndex(proxy->index(0,0));
 }
 

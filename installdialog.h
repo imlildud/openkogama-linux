@@ -33,6 +33,7 @@ public:
     ~InstallDialog();
     Version selectedVersion() const;
     QString instanceName() const;
+    static QList<Version> parse(const QByteArray &versionsJson);
 
 private:
     Ui::InstallDialog *ui;

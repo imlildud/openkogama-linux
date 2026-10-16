@@ -70,7 +70,6 @@ private:
     QString m_path;
     QString m_title;
     QString m_exe;
-    const QString m_url = "http://127.0.0.1:8080";
     QPointer<QProcess> m_server;
     QNetworkAccessManager *m_net;
     QList<QPair<QString, QString>> m_templates;

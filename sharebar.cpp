@@ -1,8 +1,12 @@
 #include "sharebar.h"
+#include "launchdialog.h"
 #include "serverconfigdialog.h"
 #include "settings.h"
+#include "tilegrid.h"
 #include "tunnel.h"
+#include <QBuffer>
 #include <QClipboard>
+#include <QImage>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QJsonArray>
@@ -19,13 +23,19 @@ namespace {
 constexpr int SlowMs = 10000;
 constexpr int CopiedMs = 1500;
 constexpr int Gap = 16;
+constexpr int UploadMs = 5 * 60 * 1000;
+constexpr int RetryMs = 5000;
+constexpr int UploadTries = 3;
+constexpr int JpegLimit = 64 * 1024;
 }
 
 ShareBar::ShareBar(QWidget *parent)
     : QFrame(parent), m_text(new QLabel(this)), m_code(new QLabel(this)), m_info(new QLabel(this)),
       m_copy(new QPushButton("Copy code", this)), m_settings(new QPushButton("Server settings", this)),
-      m_stop(new QPushButton(this)), m_slow(new QTimer(this))
+      m_stop(new QPushButton(this)), m_slow(new QTimer(this)), m_upload(new QTimer(this))
 {
+    m_upload->setInterval(UploadMs);
+    connect(m_upload, &QTimer::timeout, this, [this]() { sendThumbnail(1); });
     setObjectName("shareBar");
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(10, 3, 4, 3);
@@ -106,6 +116,7 @@ void ShareBar::stop()
         connect(reply, &QNetworkReply::finished, reply, &QObject::deleteLater);
     }
     m_listed = false;
+    m_upload->stop();
     if (m_tunnel) {
         Tunnel *tunnel = m_tunnel;
         m_tunnel = nullptr;
@@ -148,7 +159,11 @@ void ShareBar::heard(const QString &word, const QString &rest)
     if (word == "code") {
         m_codeText = Tunnel::normalize(rest);
         m_slow->stop();
-        if (m_listed && !m_codeText.isEmpty()) emit listed(Tunnel::address(m_codeText), m_title);
+        if (m_listed && !m_codeText.isEmpty()) {
+            emit listed(Tunnel::address(m_codeText), m_title);
+            sendThumbnail(UploadTries);
+            m_upload->start();
+        }
     } else if (word == "players") {
         m_players = rest.toInt();
     } else if (word == "error") {
@@ -156,6 +171,46 @@ void ShareBar::heard(const QString &word, const QString &rest)
             : rest.startsWith("rendezvous") ? "the OpenKogama P2P servers can't be reached" : rest;
     }
     refresh();
+}
+
+void ShareBar::sendThumbnail(int tries)
+{
+    if (!m_net) m_net = new QNetworkAccessManager(this);
+    QNetworkRequest local(QUrl(LocalServerUrl + "/api/server/thumbnail?world=" + QString::number(m_world)));
+    local.setTransferTimeout(8000);
+    QNetworkReply *image = m_net->get(local);
+    connect(image, &QNetworkReply::finished, this, [this, image, tries]() {
+        image->deleteLater();
+        const QByteArray jpeg = image->error() == QNetworkReply::NoError ? smallJpeg(image->readAll()) : QByteArray();
+        if (jpeg.isEmpty() || !m_listed || !m_tunnel) return;
+        QNetworkRequest request{QUrl(Settings::publicList() + "/thumbnail")};
+        request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+        request.setTransferTimeout(8000);
+        const QJsonObject body{{"secret", Settings::hostSecret()}, {"image", QString::fromLatin1(jpeg.toBase64())}};
+        QNetworkReply *reply = m_net->post(request, QJsonDocument(body).toJson(QJsonDocument::Compact));
+        connect(reply, &QNetworkReply::finished, this, [this, reply, tries]() {
+            reply->deleteLater();
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if (status == 404 && tries > 1) QTimer::singleShot(RetryMs, this, [this, tries]() { sendThumbnail(tries - 1); });
+        });
+    });
+}
+
+QByteArray ShareBar::smallJpeg(const QByteArray &bytes)
+{
+    QImage image;
+    if (bytes.isEmpty() || !image.loadFromData(bytes)) return {};
+    const QImage cover = image.scaled(TileGrid::WideImage, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+    const QImage tile = cover.copy((cover.width() - TileGrid::WideImage.width()) / 2, (cover.height() - TileGrid::WideImage.height()) / 2,
+        TileGrid::WideImage.width(), TileGrid::WideImage.height());
+    for (int quality : {80, 60, 40}) {
+        QByteArray jpeg;
+        QBuffer buffer(&jpeg);
+        buffer.open(QIODevice::WriteOnly);
+        tile.convertToFormat(QImage::Format_RGB32).save(&buffer, "JPG", quality);
+        if (!jpeg.isEmpty() && jpeg.size() <= JpegLimit) return jpeg;
+    }
+    return {};
 }
 
 void ShareBar::ended()
