@@ -12,10 +12,15 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QImage>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLabel>
 #include <QListWidget>
+#include <QMenu>
+#include <QSettings>
+#include <QTabBar>
+#include <QToolButton>
 #include <QDialogButtonBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -36,6 +41,7 @@ class MockServer : public QTcpServer
 public:
     QByteArray metadata = "{\"title\":\"A friend's server\",\"thumbnail\":\"/api/server/thumbnail\"}";
     QByteArray image;
+    QByteArray list = "[]";
     int metadataStatus = 200;
     int imageStatus = 200;
     QStringList requests;
@@ -60,6 +66,7 @@ public:
                     int status = path == "/api/server" ? metadataStatus : path == "/api/server/thumbnail" ? imageStatus : 404;
                     QByteArray body = path == "/api/server" ? metadata : path == "/api/server/thumbnail" ? image : QByteArray();
                     if (path == "/ping") { status = 200; body = "{}"; }
+                    if (path == "/servers") { status = 200; body = list; }
                     socket->write("HTTP/1.1 " + QByteArray::number(status) + " Test\r\nContent-Length: "
                         + QByteArray::number(body.size()) + "\r\nConnection: close\r\n\r\n" + body);
                     socket->disconnectFromHost();
@@ -86,6 +93,12 @@ private slots:
         QStandardPaths::setTestModeEnabled(true);
         QApplication::setOrganizationName("OpenKogamaTests");
         QApplication::setApplicationName("Launcher-" + QString::number(QApplication::applicationPid()));
+    }
+
+    void init()
+    {
+        Settings::setPublicView(false);
+        QSettings(Paths::data() + "/settings.ini", QSettings::IniFormat).setValue("launcher/serverList", "http://127.0.0.1:9");
     }
 
     void cleanup() { Settings::setServers({}); Settings::setCurrentServer({}); }
@@ -177,6 +190,47 @@ private slots:
         QTRY_COMPARE(Settings::servers().first().title.toUcs4().size(), 40);
     }
 
+    void publicListShowsAndSavesServers()
+    {
+        MockServer server;
+        server.list = QJsonDocument(QJsonArray{
+            QJsonObject{{"address", server.url()}, {"title", "Public one"}, {"clients", QJsonArray{"3.5.20"}}, {"players", 3}, {"thumbnail", true}},
+            QJsonObject{{"address", "file:///etc/passwd"}, {"title", "Bad"}},
+            QJsonObject{{"address", "p2p:abcdef"}, {"title", "Hosted"}, {"players", 1}},
+        }).toJson();
+        QSettings(Paths::data() + "/settings.ini", QSettings::IniFormat).setValue("launcher/serverList", server.url());
+        Settings::setPublicView(true);
+        {
+            ServersPage page;
+            auto *list = page.findChild<QListWidget *>("serversList");
+            QTRY_COMPARE(list->count(), 2);
+            QCOMPARE(tile(list->item(0)), QString::fromUtf8("Public one\n3 players · 3.5.20"));
+            QCOMPARE(tile(list->item(1)), QString("Hosted\n1 player"));
+            QVERIFY(page.isPublic(server.url()));
+            QVERIFY(page.isPublic("p2p:ABCDEF"));
+            QCOMPARE(page.clientsOf(server.url()), QStringList({"3.5.20"}));
+            QTRY_VERIFY(server.requests.contains("/api/server/thumbnail"));
+            list->setCurrentRow(0);
+            QAction *save = nullptr;
+            for (QAction *action : page.findChild<QToolButton *>("moreServerButton")->menu()->actions())
+                if (action->text() == "Save to my servers") save = action;
+            QVERIFY(save && save->isVisible() && save->isEnabled());
+            save->trigger();
+            QCOMPARE(Settings::servers().size(), 1);
+            QCOMPARE(Settings::servers().first().title, QString("Public one"));
+            QCOMPARE(Settings::servers().first().clients, QStringList({"3.5.20"}));
+            QVERIFY(!save->isEnabled());
+            QObject game;
+            page.reportPlaying(&game, server.url());
+            QTRY_VERIFY(server.requests.contains("/playing"));
+            page.findChild<QTabBar *>("serversViewTabs")->setCurrentIndex(1);
+            QCOMPARE(list->count(), 1);
+            QCOMPARE(list->item(0)->text(), QString("Public one"));
+        }
+        QVERIFY(!Settings::publicView());
+        QSettings(Paths::data() + "/settings.ini", QSettings::IniFormat).remove("launcher/serverList");
+    }
+
     void joinStartsGameWithServerSession()
     {
         QTemporaryDir instance;
@@ -259,6 +313,10 @@ private slots:
         save->click();
         QCOMPARE(dialog.result(), int(QDialog::Accepted));
         QCOMPARE(ServerConfigDialog::current().value("title").toString(), QString("Test"));
+        ServerConfigDialog reopened;
+        const QJsonObject shown = QJsonDocument::fromJson(reopened.findChild<QPlainTextEdit *>("serverConfigEdit")->toPlainText().toUtf8()).object();
+        QCOMPARE(shown.value("title").toString(), QString("Test"));
+        QVERIFY(shown.contains("public") && !shown.value("public").toBool());
         QVERIFY(QFile::remove(QDir(Paths::serverData()).filePath("server.json")));
     }
 

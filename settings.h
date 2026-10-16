@@ -14,13 +14,16 @@ struct GameServer
     QStringList clients;
 
     bool accepts(const QString &version) const;
+    static QString addressOf(const QString &text);
 };
 
 namespace Settings {
 
 QList<GameServer> servers();
 void setServers(const QList<GameServer> &servers);
-void addDefaultServers();
+QString publicList();
+bool publicView();
+void setPublicView(bool shown);
 QString currentServer();
 void setCurrentServer(const QString &address);
 

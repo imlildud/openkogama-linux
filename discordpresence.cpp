@@ -1,5 +1,6 @@
 #include "discordpresence.h"
 #include "settings.h"
+#include "tunnel.h"
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QJsonArray>
@@ -8,12 +9,12 @@
 #include <QLocalSocket>
 #include <QPointer>
 #include <QProcess>
+#include <QUrl>
 #include <QtEndian>
 
 namespace {
 const QString ApplicationId = "1560605777717108816";
 const QString WebsiteUrl = "https://openkogama.org";
-const QString InviteUrl = "https://discord.gg/u6tKuP3k4M";
 constexpr int PipeCount = 10;
 constexpr int ConnectTimeoutMs = 200;
 constexpr int HeaderSize = 8;
@@ -27,6 +28,7 @@ struct Game
     QString details;
     QString state;
     qint64 start;
+    QString join;
 };
 
 QList<Game> games;
@@ -48,15 +50,16 @@ void sendActivity()
 {
     if (!socket || !ready || games.isEmpty()) return;
     const Game &game = games.last();
+    const QJsonObject button = game.join.isEmpty()
+        ? QJsonObject{{"label", "Play OpenKogama"}, {"url", WebsiteUrl}}
+        : QJsonObject{{"label", Tunnel::isAddress(game.join) ? "Join this world" : "Join this server"},
+            {"url", WebsiteUrl + "/join/?server=" + QString::fromLatin1(QUrl::toPercentEncoding(game.join))}};
     const QJsonObject activity{
         {"details", game.details.left(TextLimit)},
         {"state", game.state.left(TextLimit)},
         {"timestamps", QJsonObject{{"start", game.start}}},
         {"assets", QJsonObject{{"large_image", "logo"}, {"large_text", "OpenKogama"}}},
-        {"buttons", QJsonArray{
-            QJsonObject{{"label", "Play OpenKogama"}, {"url", WebsiteUrl}},
-            QJsonObject{{"label", "Join the Discord"}, {"url", InviteUrl}},
-        }},
+        {"buttons", QJsonArray{button}},
     };
     send(Frame, {
         {"cmd", "SET_ACTIVITY"},
@@ -119,8 +122,18 @@ void openPipe()
 
 void DiscordPresence::show(QProcess *client, const QString &details, const QString &state)
 {
-    games.append({client, details, state, QDateTime::currentSecsSinceEpoch()});
+    games.append({client, details, state, QDateTime::currentSecsSinceEpoch(), {}});
     QObject::connect(client, &QProcess::finished, client, refresh);
+    refresh();
+}
+
+void DiscordPresence::join(QProcess *client, const QString &address, const QString &title)
+{
+    for (Game &game : games) {
+        if (game.client != client) continue;
+        game.join = address;
+        if (!title.isEmpty()) game.details = "Playing " + title;
+    }
     refresh();
 }
 

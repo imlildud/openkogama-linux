@@ -28,6 +28,7 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    void openLink(const QString &link);
 
 protected:
     void closeEvent(QCloseEvent *event) override;

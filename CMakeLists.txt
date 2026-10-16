@@ -19,6 +19,7 @@ qt_add_executable(openkogama-launcher
     worldsdialog.h worldsdialog.cpp worldsdialog.ui
     gamelauncher.h gamelauncher.cpp
     discordpresence.h discordpresence.cpp
+    links.h links.cpp
     serverspage.h serverspage.cpp
     tunnel.h tunnel.cpp
     sharebar.h sharebar.cpp

@@ -116,7 +116,8 @@ void ShareBar::start()
     if (clients.isEmpty() && !config.value("mixedClients").toBool()) clients.append(m_version);
     const QJsonObject info{{"title", title}, {"version", clients.size() == 1 ? clients.first().toString() : QString()},
         {"clients", clients}, {"world", m_world}};
-    Tunnel *tunnel = Tunnel::host(Settings::hostSecret(), QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact)), this);
+    Tunnel *tunnel = Tunnel::host(Settings::hostSecret(), QString::fromUtf8(QJsonDocument(info).toJson(QJsonDocument::Compact)),
+        config.value("public").toBool(), this);
     m_tunnel = tunnel;
     connect(tunnel, &Tunnel::said, this, [this, tunnel](const QString &word, const QString &rest) {
         if (tunnel == m_tunnel) heard(word, rest);

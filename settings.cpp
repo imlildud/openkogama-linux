@@ -10,11 +10,6 @@
 
 namespace {
 
-const QList<GameServer> DefaultServers = {
-    {QString(), "https://war4.openkogama.org", ">WAR 4< (map by opnfeniks)", {}, {}},
-    {QString(), "https://hyrule.openkogama.org", "2 Player Zelda (map by Caninos)", {}, {}},
-};
-
 QSettings store()
 {
     return QSettings(Paths::data() + "/settings.ini", QSettings::IniFormat);
@@ -66,20 +61,19 @@ void setServers(const QList<GameServer> &servers)
     settings.endArray();
 }
 
-void addDefaultServers()
+QString publicList()
 {
-    const QStringList offered = store().value("launcher/offeredServers").toStringList();
-    QStringList added = offered;
-    QList<GameServer> list = servers();
-    for (const GameServer &server : DefaultServers) {
-        if (offered.contains(server.address)) continue;
-        added.append(server.address);
-        if (std::none_of(list.cbegin(), list.cend(), [&](const GameServer &s) { return s.address == server.address; }))
-            list.append(server);
-    }
-    if (added == offered) return;
-    setServers(list);
-    store().setValue("launcher/offeredServers", added);
+    return store().value("launcher/serverList", "https://list.openkogama.org").toString().trimmed();
+}
+
+bool publicView()
+{
+    return store().value("launcher/publicServers", true).toBool();
+}
+
+void setPublicView(bool shown)
+{
+    store().setValue("launcher/publicServers", shown);
 }
 
 QString currentServer()
@@ -170,6 +164,18 @@ void setDiscordPresence(bool enabled)
     store().setValue("discord/presence", enabled);
 }
 
+}
+
+QString GameServer::addressOf(const QString &text)
+{
+    const QString trimmed = text.trimmed();
+    if (Tunnel::isAddress(trimmed)) return Tunnel::address(Tunnel::code(trimmed));
+    const QUrl url(trimmed);
+    if (!url.isValid() || (url.scheme() != "http" && url.scheme() != "https") || url.host().isEmpty()
+        || !url.userInfo().isEmpty() || url.hasQuery() || url.hasFragment() || url.port() == 0
+        || (!url.path().isEmpty() && url.path() != "/"))
+        return {};
+    return url.toString(QUrl::RemovePath | QUrl::StripTrailingSlash);
 }
 
 bool GameServer::accepts(const QString &version) const

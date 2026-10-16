@@ -18,7 +18,7 @@ public:
     static QString display(const QString &code);
     static QStringList clients(const QJsonObject &info);
 
-    static Tunnel *host(const QString &secret, const QString &info, QObject *parent);
+    static Tunnel *host(const QString &secret, const QString &info, bool listed, QObject *parent);
     static Tunnel *join(const QString &code, QObject *parent);
     static Tunnel *find(const QString &code, QObject *parent);
 

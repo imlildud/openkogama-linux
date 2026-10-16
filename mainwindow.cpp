@@ -8,6 +8,8 @@
 #include "worldsdialog.h"
 #include "serverspage.h"
 #include "gamelauncher.h"
+#include "discordpresence.h"
+#include "links.h"
 #include "settings.h"
 #include "creditsdialog.h"
 #include "serverconfigdialog.h"
@@ -614,14 +616,13 @@ void MainWindow::joinServer(const QString &address) {
         joinCode(address);
         return;
     }
-    const QList<GameServer> servers = Settings::servers();
-    const auto server = std::find_if(servers.cbegin(), servers.cend(), [&](const GameServer &s) { return s.address == address; });
-    if (server != servers.cend() && !server->accepts(clientVersion(instances->item(ui->versionCombo->currentIndex())))) {
+    const GameServer server{QString(), address, QString(), {}, m_servers->clientsOf(address)};
+    if (!server.accepts(clientVersion(instances->item(ui->versionCombo->currentIndex())))) {
         int match = -1;
         for (int row = instances->rowCount() - 1; row >= 0 && match < 0; --row)
-            if (server->accepts(clientVersion(instances->item(row)))) match = row;
+            if (server.accepts(clientVersion(instances->item(row)))) match = row;
         if (match < 0) {
-            QMessageBox::information(this, "Join", "This server accepts " + server->clients.join(", ") + ". Add one of these versions first.");
+            QMessageBox::information(this, "Join", "This server accepts " + server.clients.join(", ") + ". Add one of these versions first.");
             return;
         }
         ui->versionCombo->setCurrentIndex(match);
@@ -632,6 +633,10 @@ void MainWindow::joinServer(const QString &address) {
     if (!prepareInstance(path, &exe)) return;
     QProcess *client = GameLauncher::start(path, exe, address, "play", 0, this, this);
     if (!client) return;
+    if (m_servers->isPublic(address)) {
+        DiscordPresence::join(client, address, m_servers->titleOf(address));
+        m_servers->reportPlaying(client, address);
+    }
     client->setProperty("instancePath", path);
     m_remoteClients.append(client);
     connect(client, &QProcess::finished, this, [this, client]() {
@@ -640,6 +645,24 @@ void MainWindow::joinServer(const QString &address) {
     });
     Settings::setLastInstance(path);
     updateInstanceActions();
+}
+
+void MainWindow::openLink(const QString &link) {
+    if (isMinimized()) showNormal();
+    raise();
+    activateWindow();
+    const QString address = Links::serverOf(link);
+    if (address.isEmpty()) return;
+    ui->mainTabs->setCurrentWidget(m_servers);
+    if (!m_servers->canJoin()) {
+        QMessageBox::information(this, "Join", "Add a game version first, then open the link again.");
+        return;
+    }
+    const QString title = m_servers->titleOf(address);
+    const QString shown = !title.isEmpty() ? title
+        : Tunnel::isAddress(address) ? "the world with the code " + Tunnel::display(Tunnel::code(address)) : QUrl(address).host();
+    if (QMessageBox::question(this, "Join", "Join " + shown + "?") != QMessageBox::Yes) return;
+    joinServer(address);
 }
 
 void MainWindow::editServerSettings() {
@@ -721,6 +744,10 @@ void MainWindow::joinCode(const QString &address) {
             return;
         }
         trip->launched = true;
+        if (m_servers->isPublic(address)) {
+            DiscordPresence::join(client, address, m_servers->titleOf(address));
+            m_servers->reportPlaying(client, address);
+        }
         m_servers->probeThrough(address, "http://127.0.0.1:" + QString::number(trip->port));
         client->setProperty("instancePath", trip->path);
         m_remoteClients.append(client);

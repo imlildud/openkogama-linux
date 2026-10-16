@@ -57,9 +57,11 @@ QStringList Tunnel::clients(const QJsonObject &info)
     return clients;
 }
 
-Tunnel *Tunnel::host(const QString &secret, const QString &info, QObject *parent)
+Tunnel *Tunnel::host(const QString &secret, const QString &info, bool listed, QObject *parent)
 {
-    return new Tunnel({"host", "--secret", secret, "--info", info}, parent);
+    QStringList arguments{"host", "--secret", secret, "--info", info};
+    if (listed) arguments.append("--public");
+    return new Tunnel(arguments, parent);
 }
 
 Tunnel *Tunnel::join(const QString &code, QObject *parent)

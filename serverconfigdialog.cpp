@@ -22,13 +22,31 @@ const QString Starter = R"({
     "joinMode": "play",
     "clients": [],
     "mixedClients": false,
-    "keepPlayChanges": false
+    "keepPlayChanges": false,
+    "public": false
 }
 )";
 
 QString configPath()
 {
     return QDir(Paths::serverData()).filePath("server.json");
+}
+
+QString withPublic(const QString &text)
+{
+    const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8());
+    if (!document.isObject() || document.object().contains("public")) return text;
+    const qsizetype end = text.lastIndexOf('}');
+    qsizetype last = end - 1;
+    while (last > 0 && text[last].isSpace()) --last;
+    QString indent(4, ' ');
+    if (const qsizetype key = text.indexOf('"'); key > 0) {
+        const qsizetype line = text.lastIndexOf('\n', key) + 1;
+        const QString before = text.mid(line, key - line);
+        if (line > 0 && before.trimmed().isEmpty()) indent = before;
+    }
+    const QString comma = text[last] == '{' ? QString() : QString(",");
+    return text.left(last + 1) + comma + "\n" + indent + "\"public\": false\n" + text.mid(end);
 }
 }
 
@@ -58,7 +76,7 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent)
     m_text->setFont(mono);
     m_text->setLineWrapMode(QPlainTextEdit::NoWrap);
     QFile file(configPath());
-    m_text->setPlainText(file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : Starter);
+    m_text->setPlainText(file.open(QIODevice::ReadOnly) ? withPublic(QString::fromUtf8(file.readAll())) : Starter);
     layout->addWidget(m_text, 1);
     m_error->setObjectName("serverConfigError");
     m_error->setWordWrap(true);
