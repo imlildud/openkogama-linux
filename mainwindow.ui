@@ -22,19 +22,19 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <property name="leftMargin">
-     <number>16</number>
+     <number>12</number>
     </property>
     <property name="topMargin">
      <number>4</number>
     </property>
     <property name="rightMargin">
-     <number>16</number>
+     <number>12</number>
     </property>
     <property name="bottomMargin">
-     <number>16</number>
+     <number>12</number>
     </property>
     <property name="spacing">
-     <number>12</number>
+     <number>8</number>
     </property>
     <item>
      <widget class="QWidget" name="headerBar">
@@ -59,7 +59,7 @@
          <property name="minimumSize">
           <size>
            <width>240</width>
-           <height>28</height>
+           <height>0</height>
           </size>
          </property>
          <property name="accessibleName">
@@ -74,8 +74,8 @@
         <widget class="QToolButton" name="addVersionButton">
          <property name="minimumSize">
           <size>
-           <width>28</width>
-           <height>28</height>
+           <width>26</width>
+           <height>26</height>
           </size>
          </property>
          <property name="toolTip">
@@ -103,7 +103,7 @@
          <number>0</number>
         </property>
         <property name="topMargin">
-         <number>12</number>
+         <number>8</number>
         </property>
         <property name="rightMargin">
          <number>0</number>
@@ -116,7 +116,7 @@
           <widget class="QWidget" name="welcomePage">
            <layout class="QVBoxLayout" name="welcomeLayout">
             <property name="spacing">
-             <number>12</number>
+             <number>8</number>
             </property>
             <item>
              <spacer name="welcomeTopSpacer">
@@ -144,8 +144,7 @@
               </property>
               <property name="font">
                <font>
-                <pointsize>18</pointsize>
-                <bold>true</bold>
+                                <bold>true</bold>
                </font>
               </property>
               <property name="alignment">
@@ -176,8 +175,8 @@
               </property>
               <property name="minimumSize">
                <size>
-                <width>240</width>
-                <height>36</height>
+                <width>200</width>
+                <height>0</height>
                </size>
               </property>
               <property name="text">
@@ -192,8 +191,8 @@
               </property>
               <property name="minimumSize">
                <size>
-                <width>240</width>
-                <height>36</height>
+                <width>200</width>
+                <height>0</height>
                </size>
               </property>
               <property name="text">
@@ -245,7 +244,7 @@
          <number>0</number>
         </property>
         <property name="topMargin">
-         <number>12</number>
+         <number>8</number>
         </property>
         <property name="rightMargin">
          <number>0</number>
@@ -264,7 +263,7 @@
          <number>0</number>
         </property>
         <property name="topMargin">
-         <number>12</number>
+         <number>8</number>
         </property>
         <property name="rightMargin">
          <number>0</number>
@@ -273,13 +272,13 @@
          <number>0</number>
         </property>
         <property name="spacing">
-         <number>12</number>
+         <number>8</number>
         </property>
         <item>
          <widget class="QWidget" name="noVersionsPage">
           <layout class="QVBoxLayout" name="noVersionsLayout">
            <property name="spacing">
-            <number>12</number>
+            <number>8</number>
            </property>
            <item>
             <spacer name="noVersionsTopSpacer">
@@ -307,8 +306,7 @@
              </property>
              <property name="font">
               <font>
-               <pointsize>18</pointsize>
-               <bold>true</bold>
+                              <bold>true</bold>
               </font>
              </property>
              <property name="alignment">
@@ -339,8 +337,8 @@
              </property>
              <property name="minimumSize">
               <size>
-               <width>240</width>
-               <height>36</height>
+               <width>200</width>
+               <height>0</height>
               </size>
              </property>
              <property name="text">
@@ -396,7 +394,7 @@
             <number>0</number>
            </property>
            <property name="spacing">
-            <number>12</number>
+            <number>8</number>
            </property>
            <item>
             <widget class="Line" name="versionActionsLine">
@@ -444,8 +442,8 @@
               <widget class="QToolButton" name="moreVersionButton">
                <property name="minimumSize">
                 <size>
-                 <width>36</width>
-                 <height>36</height>
+                 <width>26</width>
+                 <height>26</height>
                 </size>
                </property>
                <property name="toolTip">
@@ -469,8 +467,8 @@
                </property>
                <property name="minimumSize">
                 <size>
-                 <width>140</width>
-                 <height>36</height>
+                 <width>96</width>
+                 <height>0</height>
                 </size>
                </property>
                <property name="text">

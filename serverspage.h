@@ -5,6 +5,7 @@
 #include <functional>
 
 class QEvent;
+class QJsonObject;
 class QLabel;
 class QLineEdit;
 class QListWidget;
@@ -20,6 +21,7 @@ class ServersPage : public QWidget
 public:
     explicit ServersPage(QWidget *parent = nullptr);
     void setCanJoin(bool enabled);
+    void showFound(const QString &address, const QJsonObject &info);
 
 signals:
     void joinRequested(const QString &address);
@@ -31,6 +33,7 @@ private:
     void load(const QString &select = {});
     void refresh();
     void probe(const QString &address);
+    void probeCode(const QString &address);
     void get(const QString &url, qint64 limit, std::function<void(int, const QByteArray &)> done);
     void resolve(QStringList candidates, std::function<void(const QString &)> done);
     void keepServer(const QString &address, const QString &name);
@@ -39,6 +42,7 @@ private:
     void updateActions();
     void filter();
     void addServer();
+    void joinWithCode();
     void removeServer();
     void copyAddress();
     void showMenu(const QPoint &pos);
@@ -54,6 +58,7 @@ private:
     QLabel *m_address;
     QToolButton *m_more;
     QPushButton *m_join;
+    QPushButton *m_joinCode;
     QSet<QString> m_pending;
     bool m_canJoin = false;
 };

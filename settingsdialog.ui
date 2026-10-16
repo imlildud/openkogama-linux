@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>360</width>
-    <height>230</height>
+    <height>300</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -15,19 +15,19 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="leftMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="topMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="rightMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="bottomMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="spacing">
-    <number>16</number>
+    <number>10</number>
    </property>
    <item>
     <widget class="QGroupBox" name="playerGroup">
@@ -75,6 +75,22 @@
        <widget class="QCheckBox" name="consoleOnCrashCheck">
         <property name="text">
          <string>Show the console when a game crashes</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="discordGroup">
+     <property name="title">
+      <string>Discord</string>
+     </property>
+     <layout class="QVBoxLayout" name="discordLayout">
+      <item>
+       <widget class="QCheckBox" name="discordPresenceCheck">
+        <property name="text">
+         <string>Show what I'm playing on Discord</string>
         </property>
        </widget>
       </item>

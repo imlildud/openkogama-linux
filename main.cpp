@@ -9,7 +9,7 @@ int main(int argc, char *argv[])
 {
     Updater::startup();
     QApplication a(argc, argv);
-    a.setStyle("Fusion");
+    a.setStyle(Theme::style());
     Theme::apply(a);
     a.setOrganizationName("OpenKogama");
     a.setApplicationName("OpenKogama Launcher");

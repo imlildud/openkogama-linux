@@ -1,6 +1,8 @@
 #include "settings.h"
 #include "paths.h"
+#include "tunnel.h"
 
+#include <QRandomGenerator>
 #include <QSettings>
 #include <QUrl>
 #include <QVersionNumber>
@@ -30,6 +32,11 @@ QList<GameServer> servers()
     for (int i = 0; i < count; ++i) {
         settings.setArrayIndex(i);
         const QString address = settings.value("address").toString().trimmed();
+        if (Tunnel::isAddress(address)) {
+            list.append({settings.value("name").toString(), Tunnel::address(Tunnel::code(address)),
+                settings.value("title").toString(), settings.value("thumbnail").toByteArray(), settings.value("clients").toStringList()});
+            continue;
+        }
         QUrl url(address.contains("://") ? address : "http://" + address);
         if (!url.isValid() || url.host().isEmpty() || (url.scheme() != "http" && url.scheme() != "https")
             || !url.userInfo().isEmpty() || url.hasQuery() || url.hasFragment() || url.port() == 0
@@ -105,6 +112,34 @@ void setNickname(const QString &name)
     store().setValue("player/nickname", name);
 }
 
+QString rendezvous()
+{
+    return store().value("p2p/rendezvous").toString();
+}
+
+QString hostSecret()
+{
+    QSettings settings = store();
+    QString secret = settings.value("p2p/secret").toString();
+    if (secret.size() >= 32) return secret;
+    const QString letters = "abcdefghijklmnopqrstuvwxyz0123456789";
+    secret.clear();
+    for (int i = 0; i < 32; ++i)
+        secret += letters[QRandomGenerator::system()->bounded(int(letters.size()))];
+    settings.setValue("p2p/secret", secret);
+    return secret;
+}
+
+int hostWorld()
+{
+    return store().value("p2p/world").toInt();
+}
+
+void setHostWorld(int world)
+{
+    store().setValue("p2p/world", world);
+}
+
 bool consoleOnLaunch()
 {
     return store().value("console/showOnLaunch", false).toBool();
@@ -123,6 +158,16 @@ void setConsoleOnLaunch(bool enabled)
 void setConsoleOnCrash(bool enabled)
 {
     store().setValue("console/showOnCrash", enabled);
+}
+
+bool discordPresence()
+{
+    return store().value("discord/presence", true).toBool();
+}
+
+void setDiscordPresence(bool enabled)
+{
+    store().setValue("discord/presence", enabled);
 }
 
 }

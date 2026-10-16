@@ -2,9 +2,21 @@
 #include <QApplication>
 #include <QFile>
 #include <QHash>
+#include <QProxyStyle>
 #include <QStyleHints>
 
 namespace {
+
+class PlainStyle : public QProxyStyle
+{
+public:
+    PlainStyle() : QProxyStyle("Fusion") {}
+
+    int styleHint(StyleHint hint, const QStyleOption *option, const QWidget *widget, QStyleHintReturn *data) const override
+    {
+        return hint == SH_UnderlineShortcut ? 0 : QProxyStyle::styleHint(hint, option, widget, data);
+    }
+};
 
 const QHash<QString, QString> DarkColors = {
     {"text", "#ffffff"},
@@ -66,6 +78,10 @@ void Theme::apply(QApplication &app) {
     QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, &app, [&app]() {
         app.setStyleSheet(styleSheet());
     });
+}
+
+QStyle *Theme::style() {
+    return new PlainStyle;
 }
 
 bool Theme::dark() {

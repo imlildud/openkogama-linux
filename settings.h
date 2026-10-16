@@ -30,9 +30,17 @@ void setLastInstance(const QString &path);
 QString nickname();
 void setNickname(const QString &name);
 
+QString rendezvous();
+QString hostSecret();
+int hostWorld();
+void setHostWorld(int world);
+
 bool consoleOnLaunch();
 bool consoleOnCrash();
 void setConsoleOnLaunch(bool enabled);
 void setConsoleOnCrash(bool enabled);
+
+bool discordPresence();
+void setDiscordPresence(bool enabled);
 
 }

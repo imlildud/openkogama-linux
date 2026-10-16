@@ -43,7 +43,7 @@
         <number>0</number>
        </property>
        <property name="spacing">
-        <number>12</number>
+        <number>8</number>
        </property>
        <item>
         <layout class="QHBoxLayout" name="worldToolbar">
@@ -52,7 +52,7 @@
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>28</height>
+             <height>0</height>
             </size>
            </property>
            <property name="placeholderText">
@@ -71,7 +71,7 @@
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>28</height>
+             <height>0</height>
             </size>
            </property>
            <property name="text">
@@ -84,7 +84,7 @@
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>28</height>
+             <height>0</height>
             </size>
            </property>
            <property name="text">
@@ -150,8 +150,8 @@
           <widget class="QToolButton" name="moreWorldButton">
            <property name="minimumSize">
             <size>
-             <width>36</width>
-             <height>36</height>
+             <width>26</width>
+             <height>26</height>
             </size>
            </property>
            <property name="toolTip">
@@ -169,11 +169,27 @@
           </widget>
          </item>
          <item>
+          <widget class="QPushButton" name="hostButton">
+           <property name="minimumSize">
+            <size>
+             <width>96</width>
+             <height>0</height>
+            </size>
+           </property>
+           <property name="toolTip">
+            <string>Play this world and let others join with a code</string>
+           </property>
+           <property name="text">
+            <string>Host</string>
+           </property>
+          </widget>
+         </item>
+         <item>
           <widget class="QPushButton" name="buildButton">
            <property name="minimumSize">
             <size>
-             <width>110</width>
-             <height>36</height>
+             <width>96</width>
+             <height>0</height>
             </size>
            </property>
            <property name="text">
@@ -188,8 +204,8 @@
            </property>
            <property name="minimumSize">
             <size>
-             <width>140</width>
-             <height>36</height>
+             <width>96</width>
+             <height>0</height>
             </size>
            </property>
            <property name="text">
@@ -216,7 +232,7 @@
         <number>0</number>
        </property>
        <property name="spacing">
-        <number>12</number>
+        <number>8</number>
        </property>
        <item>
         <layout class="QHBoxLayout" name="avatarToolbar">
@@ -225,7 +241,7 @@
            <property name="minimumSize">
             <size>
              <width>0</width>
-             <height>28</height>
+             <height>0</height>
             </size>
            </property>
            <property name="text">
@@ -304,8 +320,8 @@
           <widget class="QToolButton" name="moreAvatarButton">
            <property name="minimumSize">
             <size>
-             <width>36</width>
-             <height>36</height>
+             <width>26</width>
+             <height>26</height>
             </size>
            </property>
            <property name="toolTip">
@@ -326,8 +342,8 @@
           <widget class="QPushButton" name="editAvatarButton">
            <property name="minimumSize">
             <size>
-             <width>110</width>
-             <height>36</height>
+             <width>96</width>
+             <height>0</height>
             </size>
            </property>
            <property name="text">
@@ -342,8 +358,8 @@
            </property>
            <property name="minimumSize">
             <size>
-             <width>140</width>
-             <height>36</height>
+             <width>96</width>
+             <height>0</height>
             </size>
            </property>
            <property name="text">

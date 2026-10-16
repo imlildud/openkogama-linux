@@ -80,6 +80,12 @@ WorldsDialog::WorldsDialog(const QString &path, const QString &exe, QProcess *se
 
     connect(ui->playButton, &QPushButton::clicked, this, [this]() { launch("play", selectedWorld()); });
     connect(ui->buildButton, &QPushButton::clicked, this, [this]() { launch("edit", selectedWorld()); });
+    connect(ui->hostButton, &QPushButton::clicked, this, [this]() {
+        const int world = selectedWorld();
+        if (world == 0) return;
+        emit hostRequested(world, ui->worldsList->currentItem()->data(NameRole).toString());
+        launch("play", world);
+    });
     connect(ui->editAvatarButton, &QPushButton::clicked, this, &WorldsDialog::editAvatar);
     connect(ui->newButton, &QPushButton::clicked, this, &WorldsDialog::createWorld);
     connect(ui->importButton, &QPushButton::clicked, this, &WorldsDialog::importWorld);
@@ -179,6 +185,7 @@ void WorldsDialog::updateWorldActions() {
     QListWidgetItem *item = ui->worldsList->currentItem();
     bool selected = item && !item->isHidden();
     ui->playButton->setEnabled(selected);
+    ui->hostButton->setEnabled(selected);
     ui->buildButton->setEnabled(selected);
     ui->moreWorldButton->setEnabled(selected);
     ui->selectedWorldLabel->setText(selected ? item->text() : "No world selected");
@@ -345,15 +352,13 @@ void WorldsDialog::loadTemplates() {
 
 void WorldsDialog::createWorld() {
     QDialog dialog(this);
-    dialog.setWindowTitle("New World");
+    dialog.setWindowTitle("New world");
 
     dialog.setMinimumWidth(380);
 
-    auto *name = new QLineEdit("New World", &dialog);
-    name->setMinimumHeight(28);
+    auto *name = new QLineEdit("New world", &dialog);
     name->selectAll();
     auto *templates = new QComboBox(&dialog);
-    templates->setMinimumHeight(28);
     for (const auto &[id, title] : std::as_const(m_templates))
         templates->addItem(title, id);
 
@@ -367,10 +372,10 @@ void WorldsDialog::createWorld() {
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
 
     auto *layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(16, 16, 16, 16);
-    layout->setSpacing(16);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
     auto *form = new QFormLayout;
-    form->setSpacing(12);
+    form->setSpacing(8);
     form->addRow("Name:", name);
     form->addRow("Template:", templates);
     layout->addLayout(form);
@@ -525,7 +530,7 @@ void WorldsDialog::deleteWorld() {
     QListWidgetItem *item = ui->worldsList->currentItem();
     if (!item) return;
 
-    auto answer = QMessageBox::question(this, "Delete World",
+    auto answer = QMessageBox::question(this, "Delete world",
         "Delete \"" + item->text() + "\"? This can't be undone.",
         QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
     if (answer != QMessageBox::Yes) return;
@@ -541,7 +546,7 @@ void WorldsDialog::deleteWorld() {
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError)
-            QMessageBox::warning(this, "Delete World", "This world is open in the game. Close it first.");
+            QMessageBox::warning(this, "Delete world", "This world is open in the game. Close it first.");
         loadWorlds();
     });
 }

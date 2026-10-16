@@ -3,7 +3,7 @@ QPushButton {
     color: @text@;
     border: 1px solid @border@;
     border-radius: 4px;
-    padding: 0 14px;
+    padding: 0 12px;
     min-height: 26px;
 }
 QPushButton:hover { background: @hover@; border-color: @hover-border@; }
@@ -12,21 +12,16 @@ QPushButton:disabled { background: @disabled@; color: @disabled-text@; border-co
 QPushButton:flat { background: transparent; border: none; }
 QPushButton:flat:hover { background: @button@; }
 
-QPushButton[primary="true"] { background: #3a7a80; color: #ffffff; border: 1px solid #3a7a80; font-weight: bold; padding-left: 20px; padding-right: 20px; }
+QPushButton[primary="true"] { background: #3a7a80; color: #ffffff; border: 1px solid #3a7a80; font-weight: bold; padding-left: 14px; padding-right: 14px; }
 QPushButton[primary="true"]:hover { background: #438a90; border-color: #438a90; }
 QPushButton[primary="true"]:pressed { background: #2c5e63; border-color: #2c5e63; }
 QPushButton[primary="true"]:disabled { background: @disabled@; color: @disabled-text@; border-color: @disabled-border@; }
-
-QPushButton#playButton, QPushButton#buildButton, QPushButton#useAvatarButton,
-QPushButton#editAvatarButton, QPushButton#useVersionButton, QPushButton#joinServerButton { font-size: 11pt; min-height: 34px; }
-QPushButton#openWorldsButton, QPushButton#firstVersionButton, QPushButton#noVersionsButton { min-height: 34px; }
 
 QToolButton {
     background: transparent;
     border: none;
     border-radius: 4px;
     padding: 0 6px;
-    font-size: 16px;
 }
 QToolButton:hover { background: @button@; }
 QToolButton:disabled { color: @disabled-text@; }
@@ -75,8 +70,8 @@ QTabBar::tab {
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    padding: 7px 0;
-    margin-right: 24px;
+    padding: 5px 0;
+    margin-right: 16px;
     color: @muted@;
 }
 QTabBar::tab:hover { color: @text@; }
@@ -88,7 +83,6 @@ QListView#instancesView::item { padding: 4px 0; }
 QAbstractItemView, QLineEdit, QPlainTextEdit, QTextEdit { selection-background-color: #3a7a80; selection-color: #ffffff; }
 QTreeView { alternate-background-color: @alternate@; }
 
-QLabel#selectedWorldLabel, QLabel#selectedAvatarLabel, QLabel#instanceNameLabel, QLabel#selectedServerLabel { font-weight: bold; font-size: 11pt; }
 QLabel#instanceVersionLabel, QLabel#selectedServerAddress { color: @muted@; }
 
 QPushButton:default { border-color: @hover-border@; }
@@ -97,13 +91,13 @@ QDialogButtonBox QPushButton[primary="true"] { padding-left: 14px; padding-right
 
 QToolButton#addVersionButton { padding: 0; min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; qproperty-icon: url(@plus@); qproperty-iconSize: 12px 12px; }
 QToolButton#moreWorldButton, QToolButton#moreAvatarButton,
-QToolButton#moreVersionButton, QToolButton#moreServerButton { padding: 0; min-width: 36px; max-width: 36px; min-height: 36px; max-height: 36px; }
+QToolButton#moreVersionButton, QToolButton#moreServerButton { padding: 0; min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }
 
 QMenuBar { background: transparent; }
 QMenuBar::item { padding: 4px 8px; background: transparent; border-radius: 4px; }
 QMenuBar::item:selected, QMenuBar::item:pressed { background: @button@; }
 QMenu { background: @field@; border: 1px solid @border@; padding: 4px; }
-QMenu::item { padding: 6px 24px 6px 12px; border-radius: 4px; }
+QMenu::item { padding: 5px 20px 5px 10px; border-radius: 4px; }
 QMenu::item:selected { background: #3a7a80; color: #ffffff; }
 QMenu::item:disabled { color: @disabled-text@; }
 QMenu::separator { height: 1px; background: @separator@; margin: 4px 8px; }
@@ -123,3 +117,4 @@ QCheckBox::indicator:checked { background: #3a7a80; border-color: #3a7a80; image
 
 QProgressBar { background: @field@; border: 1px solid @border@; border-radius: 4px; text-align: center; color: @text@; }
 QProgressBar::chunk { background: #3a7a80; border-radius: 3px; }
+QFrame#shareBar { background: @alternate@; border: 1px solid @border@; border-left: 3px solid #3a7a80; border-radius: 6px; }

@@ -12,6 +12,7 @@
 #include <QSet>
 
 class WorldsDialog;
+class ShareBar;
 class ServersPage;
 class QProcess;
 
@@ -26,6 +27,9 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
 
 private slots:
     void onInstallTriggered();
@@ -47,6 +51,8 @@ private:
     bool launchInstance(const QString &path);
     bool prepareInstance(const QString &path, QString *executable);
     void joinServer(const QString &address);
+    void joinCode(const QString &address);
+    void updateHostVersion();
     bool hasRemoteGames() const;
     bool startLocalServer(const QString &version, QProcess **server);
 
@@ -56,6 +62,7 @@ private:
     QString m_versionsError;
 
     QPointer<WorldsDialog> m_worlds;
+    ShareBar *m_share;
     ServersPage *m_servers;
     QList<QPointer<QProcess>> m_remoteClients;
     QString m_activePath;

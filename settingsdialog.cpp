@@ -1,6 +1,7 @@
 #include "settingsdialog.h"
 #include "ui_settingsdialog.h"
 #include "settings.h"
+#include "discordpresence.h"
 
 SettingsDialog::SettingsDialog(QWidget *parent)
     : QDialog(parent)
@@ -10,6 +11,7 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     ui->nicknameEdit->setText(Settings::nickname());
     ui->consoleOnLaunchCheck->setChecked(Settings::consoleOnLaunch());
     ui->consoleOnCrashCheck->setChecked(Settings::consoleOnCrash());
+    ui->discordPresenceCheck->setChecked(Settings::discordPresence());
 }
 
 SettingsDialog::~SettingsDialog()
@@ -22,5 +24,7 @@ void SettingsDialog::accept()
     Settings::setNickname(ui->nicknameEdit->text().trimmed());
     Settings::setConsoleOnLaunch(ui->consoleOnLaunchCheck->isChecked());
     Settings::setConsoleOnCrash(ui->consoleOnCrashCheck->isChecked());
+    Settings::setDiscordPresence(ui->discordPresenceCheck->isChecked());
+    DiscordPresence::refresh();
     QDialog::accept();
 }

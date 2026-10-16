@@ -1,5 +1,7 @@
 #include "serverspage.h"
 #include "settings.h"
+#include "tunnel.h"
+#include "sharebar.h"
 #include "gamelauncher.h"
 #include "centereddelegate.h"
 #include <QApplication>
@@ -10,6 +12,7 @@
 #include <QImage>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
 #include <QShortcut>
@@ -21,6 +24,8 @@
 #include <QTcpSocket>
 #include <QTest>
 #include <QTemporaryDir>
+#include <QTextStream>
+#include <QThread>
 
 class MockServer : public QTcpServer
 {
@@ -190,6 +195,49 @@ private slots:
         QTRY_VERIFY(!client || client->state() == QProcess::NotRunning);
     }
 
+    void codeShowsHostedWorld()
+    {
+        QCOMPARE(Tunnel::normalize("abc-def"), QString("ABCDEF"));
+        QCOMPARE(Tunnel::normalize(" ABC DEF "), QString("ABCDEF"));
+        QVERIFY(Tunnel::normalize("ABCDE1").isEmpty());
+        QVERIFY(Tunnel::normalize("ABCDEFG").isEmpty());
+        QCOMPARE(Tunnel::display("ABCDEF"), QString("ABC-DEF"));
+        const QString server = QApplication::applicationDirPath() + "/server";
+        QVERIFY(QDir().mkpath(server));
+        QFile::remove(server + "/openkogama-server.exe");
+        QVERIFY(QFile::copy(QApplication::applicationFilePath(), server + "/openkogama-server.exe"));
+        Settings::setServers({{"Code ABC-DEF", "p2p:abc-def", {}, {}}});
+        QCOMPARE(Settings::servers().first().address, QString("p2p:ABCDEF"));
+        {
+            ServersPage page;
+            auto *list = page.findChild<QListWidget *>("serversList");
+            QTRY_COMPARE(tile(list->item(0)), QString::fromUtf8("Fake world (Ann)\nOnline · 3.5.20"));
+            QCOMPARE(Settings::servers().first().clients, QStringList({"3.5.20"}));
+            QCOMPARE(page.findChild<QLabel *>("selectedServerAddress")->text(), QString("Code ABC-DEF"));
+        }
+        QDir(server).removeRecursively();
+    }
+
+    void hostingShowsCodeAndFriends()
+    {
+        const QString server = QApplication::applicationDirPath() + "/server";
+        QVERIFY(QDir().mkpath(server));
+        QFile::remove(server + "/openkogama-server.exe");
+        QVERIFY(QFile::copy(QApplication::applicationFilePath(), server + "/openkogama-server.exe"));
+        {
+            ShareBar bar;
+            bar.share(4, "Fake world", "3.5.20");
+            QVERIFY(!bar.isHidden());
+            QTRY_COMPARE(bar.findChild<QLabel *>("shareCode")->text(), QString("Code ABC-DEF"));
+            QTRY_COMPARE(bar.findChild<QLabel *>("shareInfo")->text(), QString("1 player joined"));
+            QCOMPARE(bar.players(), 1);
+            bar.findChild<QPushButton *>("shareStopButton")->click();
+            QVERIFY(bar.isHidden());
+            QCOMPARE(bar.players(), 0);
+        }
+        QDir(server).removeRecursively();
+    }
+
     void cleanupTestCase()
     {
         const QString settings = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + "/settings.ini";
@@ -202,6 +250,16 @@ int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
     const QString package = app.arguments().value(1);
+    if (package == "tunnel") {
+        QTextStream out(stdout);
+        if (app.arguments().value(2) == "host") {
+            out << "code ABCDEF" << Qt::endl << "players 1" << Qt::endl;
+            QThread::sleep(5);
+            return 0;
+        }
+        out << "found {\"title\":\"Fake world (Ann)\",\"version\":\"3.5.20\",\"world\":4}" << Qt::endl;
+        return 0;
+    }
     if (package.startsWith("kogamaPackage:")) {
         QFile capture(QDir::current().filePath("launch-capture.json"));
         if (!capture.open(QIODevice::WriteOnly)) return 1;

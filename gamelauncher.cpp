@@ -4,6 +4,7 @@
 #include "webplayerruntime.h"
 #include "consolewindow.h"
 #include "settings.h"
+#include "discordpresence.h"
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
@@ -26,6 +27,21 @@ static QString instanceTitle(const QString &path)
             return "KoGaMa " + value;
     }
     return "KoGaMa";
+}
+
+static QString presenceDetails(const QString &url, const QString &mode)
+{
+    if (mode == "avatar")
+        return "Editing an avatar";
+    if (mode != "play")
+        return "Building a world";
+    if (url == LocalServerUrl)
+        return "Playing a local world";
+    const QList<GameServer> servers = Settings::servers();
+    for (const GameServer &server : servers)
+        if (server.address == url && !server.title.isEmpty())
+            return "Playing " + server.title;
+    return "Playing online";
 }
 
 QProcess *GameLauncher::start(const QString &path, const QString &exe, const QString &url, const QString &mode, int world, QWidget *owner, QWidget *parent) {
@@ -111,6 +127,7 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         QMessageBox::warning(parent, "Worlds", "Could not start " + exe);
         return nullptr;
     }
+    DiscordPresence::show(client, presenceDetails(url, mode), title);
     if (Settings::consoleOnLaunch())
         console->show();
     return client;

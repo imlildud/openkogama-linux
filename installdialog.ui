@@ -17,20 +17,20 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>Install Version</string>
+   <string>Add version</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <property name="leftMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="topMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="rightMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <property name="bottomMargin">
-    <number>16</number>
+    <number>12</number>
    </property>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout" stretch="2,1">

@@ -10,10 +10,14 @@
 #include "gamelauncher.h"
 #include "settings.h"
 #include "creditsdialog.h"
+#include "sharebar.h"
+#include "tunnel.h"
 #include "paths.h"
 #include "theme.h"
 #include "webplayerruntime.h"
+#include <QAction>
 #include <QApplication>
+#include <QCloseEvent>
 #include <QDesktopServices>
 #include <QDir>
 #include <QFile>
@@ -47,7 +51,9 @@
 #include <QFormLayout>
 #include <QDialogButtonBox>
 #include <QVersionNumber>
+#include <QProgressDialog>
 #include <algorithm>
+#include <memory>
 
 static constexpr int NameRole = Qt::UserRole + 1;
 static constexpr int VersionRole = Qt::UserRole + 2;
@@ -126,6 +132,13 @@ MainWindow::MainWindow(QWidget *parent)
     m_servers = new ServersPage(this);
     ui->mainTabs->insertTab(1, m_servers, "&Servers");
     connect(m_servers, &ServersPage::joinRequested, this, &MainWindow::joinServer);
+    m_share = new ShareBar(this);
+    ui->verticalLayout->insertWidget(ui->verticalLayout->indexOf(ui->mainTabs), m_share);
+    auto *guide = new QAction("Host a server that stays online...", this);
+    connect(guide, &QAction::triggered, this, []() {
+        QDesktopServices::openUrl(QUrl("https://github.com/openkogama/openkogama-server/blob/main/HOSTING.md"));
+    });
+    ui->menuHelp->insertAction(ui->actionCredits, guide);
     ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
     connect(ui->actionInstall, &QAction::triggered, this, &MainWindow::onInstallTriggered);
     connect(ui->actionDiscord, &QAction::triggered, this, &MainWindow::onDiscordTriggered);
@@ -304,6 +317,7 @@ void MainWindow::onVersionChanged() {
     }
     Settings::setLastInstance(path);
     updatePlayPage();
+    updateHostVersion();
 }
 
 MainWindow::~MainWindow()
@@ -447,7 +461,7 @@ void MainWindow::duplicateInstance() {
         dest = Paths::instances() + "/" + folder + " (" + QString::number(n) + ")";
 
     auto *progress = new QProgressDialog("Duplicating " + index.data(NameRole).toString() + "...", QString(), 0, 0, this);
-    progress->setWindowTitle("Duplicate Instance");
+    progress->setWindowTitle("Duplicate version");
     progress->setWindowModality(Qt::WindowModal);
     progress->setMinimumDuration(0);
     progress->show();
@@ -458,7 +472,7 @@ void MainWindow::duplicateInstance() {
         watcher->deleteLater();
         if (!watcher->result() || !saveInstanceName(dest, name)) {
             QDir(dest).removeRecursively();
-            QMessageBox::warning(this, "Duplicate Instance", "Could not copy the instance files");
+            QMessageBox::warning(this, "Duplicate version", "Could not copy the version files");
             return;
         }
         loadInstances();
@@ -487,7 +501,7 @@ void MainWindow::deleteInstance() {
 
     QDir dir(index.data(Qt::UserRole).toString());
     if (QDir::cleanPath(dir.absolutePath()).startsWith(QDir::cleanPath(Paths::instances()) + "/") && !dir.removeRecursively())
-        QMessageBox::warning(this, "Delete Instance", "Some files could not be deleted. Close the game if it is running and try again.");
+        QMessageBox::warning(this, "Delete version", "Some files could not be deleted. Close the game if it is running and try again.");
 
     loadInstances();
 }
@@ -542,6 +556,9 @@ bool MainWindow::launchInstance(const QString &path) {
 
     if (!m_worlds) {
         m_worlds = new WorldsDialog(path, exe, server, this);
+        connect(m_worlds, &WorldsDialog::hostRequested, this, [this](int world, const QString &name) {
+            m_share->share(world, name, clientVersion(instances->item(ui->versionCombo->currentIndex())));
+        });
         m_worlds->setWindowFlags(Qt::Widget);
         m_worlds->hide();
         ui->worldsLayout->addWidget(m_worlds->worldsPage());
@@ -561,6 +578,7 @@ bool MainWindow::launchInstance(const QString &path) {
     ui->playStack->setCurrentWidget(ui->worldsPage);
     updateInstanceActions();
     updatePlayPage();
+    updateHostVersion();
     return true;
 }
 
@@ -585,6 +603,10 @@ void MainWindow::joinServer(const QString &address) {
         const QString name = QInputDialog::getText(this, "Join", "Pick a nickname that other players will see:", QLineEdit::Normal, QString(), &ok).trimmed();
         if (!ok || name.isEmpty()) return;
         Settings::setNickname(name.left(20));
+    }
+    if (Tunnel::isAddress(address)) {
+        joinCode(address);
+        return;
     }
     const QList<GameServer> servers = Settings::servers();
     const auto server = std::find_if(servers.cbegin(), servers.cend(), [&](const GameServer &s) { return s.address == address; });
@@ -612,4 +634,117 @@ void MainWindow::joinServer(const QString &address) {
     });
     Settings::setLastInstance(path);
     updateInstanceActions();
+}
+
+void MainWindow::updateHostVersion() {
+    m_share->setVersion(clientVersion(instances->item(ui->versionCombo->currentIndex())));
+}
+
+void MainWindow::closeEvent(QCloseEvent *event) {
+    const int players = m_share->players();
+    if (players > 0 && QMessageBox::question(this, "Close launcher",
+            QString(players == 1 ? "A player is" : "Players are") + " in your world. Closing the launcher disconnects them. Close anyway?")
+            != QMessageBox::Yes) {
+        event->ignore();
+        return;
+    }
+    QMainWindow::closeEvent(event);
+}
+
+void MainWindow::joinCode(const QString &address) {
+    struct Trip {
+        QString path;
+        QString exe;
+        QString error;
+        int world = 0;
+        int port = 0;
+        bool cancelled = false;
+        bool launched = false;
+    };
+    const QString code = Tunnel::code(address);
+    auto trip = std::make_shared<Trip>();
+    QPointer<QProgressDialog> progress = new QProgressDialog("Looking for " + Tunnel::display(code) + "...", "Cancel", 0, 0, this);
+    progress->setWindowTitle("Join");
+    progress->setWindowModality(Qt::WindowModal);
+    progress->setMinimumDuration(0);
+    progress->setAttribute(Qt::WA_DeleteOnClose);
+    progress->show();
+    QPointer<Tunnel> tunnel = Tunnel::join(code, this);
+
+    auto dismiss = [this, progress]() {
+        if (!progress) return;
+        progress->disconnect(this);
+        progress->close();
+    };
+    auto launch = [this, trip, tunnel, dismiss]() {
+        if (trip->launched || trip->path.isEmpty() || trip->port == 0) return;
+        dismiss();
+        QProcess *client = GameLauncher::start(trip->path, trip->exe, "http://127.0.0.1:" + QString::number(trip->port), "play", trip->world, this, this);
+        if (!client) {
+            if (tunnel) tunnel->stop();
+            return;
+        }
+        trip->launched = true;
+        client->setProperty("instancePath", trip->path);
+        m_remoteClients.append(client);
+        connect(client, &QProcess::finished, this, [this, client, tunnel]() {
+            m_remoteClients.removeAll(client);
+            if (tunnel) tunnel->stop();
+            updateInstanceActions();
+        });
+        Settings::setLastInstance(trip->path);
+        updateInstanceActions();
+    };
+
+    connect(progress, &QProgressDialog::canceled, this, [trip, tunnel]() {
+        trip->cancelled = true;
+        if (tunnel) tunnel->stop();
+    });
+    connect(tunnel, &Tunnel::said, this, [this, address, code, trip, tunnel, progress, launch](const QString &word, const QString &rest) {
+        if (word == "ready") {
+            trip->port = rest.section(' ', 0, 0).toInt();
+            launch();
+        } else if (word == "missing") {
+            trip->error = "Nobody is hosting with the code " + Tunnel::display(code) + " right now.";
+        } else if (word == "error") {
+            trip->error = rest.startsWith("rendezvous") ? "Could not reach the OpenKogama P2P server. Check your internet connection."
+                : rest.startsWith("host") ? "Could not connect to the host. Try again in a moment."
+                : "Could not join: " + rest;
+        } else if (word == "found") {
+            const QJsonObject info = QJsonDocument::fromJson(rest.toUtf8()).object();
+            m_servers->showFound(address, info);
+            const QString version = info.value("version").toString();
+            const GameServer host{QString(), address, QString(), {}, version.isEmpty() ? QStringList() : QStringList{version}};
+            int row = ui->versionCombo->currentIndex();
+            if (!host.accepts(clientVersion(instances->item(row)))) {
+                row = -1;
+                for (int candidate = instances->rowCount() - 1; candidate >= 0 && row < 0; --candidate)
+                    if (host.accepts(clientVersion(instances->item(candidate)))) row = candidate;
+            }
+            if (row < 0 || clientVersion(instances->item(row)) == "2012") {
+                trip->error = row < 0 ? "This world needs KoGaMa " + version + ". Add that version first."
+                    : "KoGaMa 2012 can't join with a code yet.";
+                if (tunnel) tunnel->stop();
+                return;
+            }
+            const QString path = instances->item(row)->data(Qt::UserRole).toString();
+            QString exe;
+            if (!launchInstance(path) || !prepareInstance(path, &exe)) {
+                trip->cancelled = true;
+                if (tunnel) tunnel->stop();
+                return;
+            }
+            trip->path = path;
+            trip->exe = exe;
+            trip->world = info.value("world").toInt();
+            if (progress) progress->setLabelText("Connecting to " + info.value("title").toString() + "...");
+            launch();
+        }
+    });
+    connect(tunnel, &Tunnel::ended, this, [this, trip, tunnel, dismiss]() {
+        dismiss();
+        if (!trip->launched && !trip->cancelled)
+            QMessageBox::information(this, "Join", trip->error.isEmpty() ? "Could not connect to the host." : trip->error);
+        if (tunnel) tunnel->deleteLater();
+    });
 }

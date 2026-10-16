@@ -2,6 +2,7 @@
 #include "centereddelegate.h"
 #include "tilegrid.h"
 #include "settings.h"
+#include "tunnel.h"
 #include <QBuffer>
 #include <QFrame>
 #include <QToolButton>
@@ -9,7 +10,6 @@
 #include <QMenu>
 #include <QGuiApplication>
 #include <QClipboard>
-#include <QDesktopServices>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QEvent>
@@ -40,7 +40,6 @@ constexpr int TitleRole = Qt::UserRole + 1;
 constexpr int StatusRole = Qt::UserRole + 2;
 constexpr int ClientsRole = Qt::UserRole + 3;
 constexpr qint64 ThumbnailLimit = 256 * 1024;
-constexpr auto HostingGuide = "https://github.com/openkogama/openkogama-server/blob/main/HOSTING.md";
 
 QString titleText(const QString &text)
 {
@@ -56,6 +55,7 @@ QString titleText(const QString &text)
 
 QString shortAddress(const QString &address)
 {
+    if (Tunnel::isAddress(address)) return "Code " + Tunnel::display(Tunnel::code(address));
     const QUrl url(address);
     if (url.host().isEmpty()) return address;
     const bool defaultPort = url.port() == -1 || (url.scheme() == "http" && url.port() == 8080) || (url.scheme() == "https" && url.port() == 443);
@@ -64,6 +64,7 @@ QString shortAddress(const QString &address)
 
 QString sharedAddress(const QString &address)
 {
+    if (Tunnel::isAddress(address)) return Tunnel::display(Tunnel::code(address));
     return QUrl(address).scheme() == "https" ? address : shortAddress(address);
 }
 
@@ -126,27 +127,24 @@ QByteArray normalizedThumbnail(QByteArray bytes)
 ServersPage::ServersPage(QWidget *parent)
     : QWidget(parent), m_net(new QNetworkAccessManager(this)), m_list(new QListWidget(this)),
       m_search(new QLineEdit(this)), m_empty(new QLabel(this)), m_selected(new QLabel(this)),
-      m_address(new QLabel(this)), m_more(new QToolButton(this)), m_join(new QPushButton("&Join", this))
+      m_address(new QLabel(this)), m_more(new QToolButton(this)), m_join(new QPushButton("&Join", this)),
+      m_joinCode(new QPushButton("Join with code", this))
 {
     setObjectName("serversPage");
     auto *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 12, 0, 0);
-    layout->setSpacing(12);
+    layout->setContentsMargins(0, 8, 0, 0);
+    layout->setSpacing(8);
 
     auto *toolbar = new QHBoxLayout;
     m_search->setPlaceholderText("Search your servers...");
     m_search->setAccessibleName("Search servers");
     m_search->setClearButtonEnabled(true);
-    m_search->setMinimumHeight(28);
     auto *add = new QPushButton("Add server...", this);
     add->setObjectName("addServerButton");
-    add->setMinimumHeight(28);
-    auto *host = new QPushButton("Host a server", this);
-    host->setObjectName("hostServerButton");
-    host->setMinimumHeight(28);
-    host->setToolTip("Open the hosting guide in your browser");
+    m_joinCode->setObjectName("joinCodeButton");
+    m_joinCode->setToolTip("Join a hosted world with its code");
     toolbar->addWidget(m_search, 1);
-    toolbar->addWidget(host);
+    toolbar->addWidget(m_joinCode);
     toolbar->addWidget(add);
     layout->addLayout(toolbar);
 
@@ -174,7 +172,6 @@ ServersPage::ServersPage(QWidget *parent)
     m_more->setObjectName("moreServerButton");
     m_more->setText(QString::fromUtf8("\u2022\u2022\u2022"));
     m_more->setToolTip("More");
-    m_more->setMinimumSize(36, 36);
     m_more->setAutoRaise(true);
     m_more->setPopupMode(QToolButton::InstantPopup);
     auto *menu = new QMenu(this);
@@ -184,7 +181,7 @@ ServersPage::ServersPage(QWidget *parent)
     m_more->setMenu(menu);
     m_join->setObjectName("joinServerButton");
     m_join->setProperty("primary", true);
-    m_join->setMinimumSize(140, 36);
+    m_join->setMinimumWidth(96);
     actions->addWidget(m_selected);
     actions->addWidget(m_address);
     actions->addStretch(1);
@@ -193,7 +190,7 @@ ServersPage::ServersPage(QWidget *parent)
     layout->addLayout(actions);
 
     connect(add, &QPushButton::clicked, this, &ServersPage::addServer);
-    connect(host, &QPushButton::clicked, this, []() { QDesktopServices::openUrl(QUrl(HostingGuide)); });
+    connect(m_joinCode, &QPushButton::clicked, this, &ServersPage::joinWithCode);
     connect(m_join, &QPushButton::clicked, this, &ServersPage::join);
     connect(m_list, &QListWidget::itemActivated, this, [this]() { join(); });
     connect(m_list, &QListWidget::currentItemChanged, this, [this]() { updateActions(); });
@@ -218,6 +215,7 @@ void ServersPage::setCanJoin(bool enabled)
     m_canJoin = enabled;
     updateActions();
 }
+
 
 QString ServersPage::selectedAddress() const
 {
@@ -261,7 +259,7 @@ void ServersPage::filter()
         if (visible && !first) first = item;
     }
     if (!m_list->currentItem() || m_list->currentItem()->isHidden()) m_list->setCurrentItem(first);
-    m_empty->setText(m_list->count() == 0 ? "Add a server by its address, then click Join to play."
+    m_empty->setText(m_list->count() == 0 ? "Add a server by its address, or join a hosted world with its code."
         : "No servers match your search.");
     m_empty->setVisible(!first);
     updateActions();
@@ -276,6 +274,7 @@ void ServersPage::updateActions()
     m_more->setEnabled(!address.isEmpty());
     m_join->setEnabled(m_canJoin && !address.isEmpty());
     m_join->setToolTip(m_canJoin ? QString() : "Add a game version first");
+    m_joinCode->setEnabled(m_canJoin);
 }
 
 void ServersPage::setStatus(const QString &address, const QString &status)
@@ -321,6 +320,10 @@ void ServersPage::refresh()
 
 void ServersPage::probe(const QString &address)
 {
+    if (Tunnel::isAddress(address)) {
+        probeCode(address);
+        return;
+    }
     if (m_pending.contains(address)) return;
     m_pending.insert(address);
     get(address + "/api/server", 4096, [this, address](int status, const QByteArray &data) {
@@ -364,6 +367,47 @@ void ServersPage::probe(const QString &address)
     });
 }
 
+void ServersPage::probeCode(const QString &address)
+{
+    if (m_pending.contains(address)) return;
+    m_pending.insert(address);
+    Tunnel *tunnel = Tunnel::find(Tunnel::code(address), this);
+    auto found = std::make_shared<bool>(false);
+    connect(tunnel, &Tunnel::said, this, [this, address, found](const QString &word, const QString &rest) {
+        if (word != "found") return;
+        *found = true;
+        showFound(address, QJsonDocument::fromJson(rest.toUtf8()).object());
+    });
+    connect(tunnel, &Tunnel::ended, this, [this, tunnel, address, found]() {
+        m_pending.remove(address);
+        if (!*found) setStatus(address, "Offline");
+        tunnel->deleteLater();
+    });
+}
+
+void ServersPage::showFound(const QString &address, const QJsonObject &info)
+{
+    const QString title = titleText(info.value("title").toString());
+    const QString version = info.value("version").toString().trimmed().left(64);
+    const QStringList clients = version.isEmpty() ? QStringList() : QStringList{version};
+    auto servers = Settings::servers();
+    auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
+    if (it != servers.end() && ((!title.isEmpty() && title != it->title) || clients != it->clients)) {
+        if (!title.isEmpty()) it->title = title;
+        it->clients = clients;
+        Settings::setServers(servers);
+    }
+    if (auto *item = find(address)) {
+        item->setData(ClientsRole, clients);
+        if (!title.isEmpty()) {
+            item->setData(TitleRole, title);
+            item->setText(title);
+        }
+    }
+    setStatus(address, "Online");
+    filter();
+}
+
 void ServersPage::fetchThumbnail(const QString &address)
 {
     get(address + "/api/server/thumbnail", ThumbnailLimit, [this, address](int status, const QByteArray &data) {
@@ -387,15 +431,13 @@ void ServersPage::addServer()
     auto *name = new QLineEdit(&dialog);
     name->setMaxLength(40);
     name->setPlaceholderText("Optional name");
-    name->setMinimumHeight(28);
     auto *address = new QLineEdit(&dialog);
     address->setPlaceholderText("192.168.1.20 or example.com");
-    address->setMinimumHeight(28);
     auto *layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(16, 16, 16, 16);
-    layout->setSpacing(16);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
     auto *form = new QFormLayout;
-    form->setSpacing(12);
+    form->setSpacing(8);
     form->addRow("Name:", name);
     form->addRow("Address:", address);
     layout->addLayout(form);
@@ -410,6 +452,12 @@ void ServersPage::addServer()
     });
     connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
         const QString entered = address->text().trimmed();
+        const QString code = entered.contains('.') || entered.contains(':') ? QString() : Tunnel::normalize(entered);
+        if (!code.isEmpty()) {
+            keepServer(Tunnel::address(code), name->text().trimmed());
+            dialog.accept();
+            return;
+        }
         const bool explicitScheme = entered.contains("://");
         QUrl url(explicitScheme ? entered : "http://" + entered);
         if (!url.isValid() || url.host().isEmpty() || (url.scheme() != "http" && url.scheme() != "https")
@@ -443,6 +491,49 @@ void ServersPage::addServer()
     dialog.exec();
 }
 
+void ServersPage::joinWithCode()
+{
+    QDialog dialog(this);
+    dialog.setWindowTitle("Join with code");
+    dialog.setMinimumWidth(360);
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+    auto *hint = new QLabel("Type the code shown in the host's launcher after they click Host.", &dialog);
+    hint->setWordWrap(true);
+    layout->addWidget(hint);
+    auto *code = new QLineEdit(&dialog);
+    code->setObjectName("joinCodeEdit");
+    code->setPlaceholderText("ABC-DEF");
+    code->setMaxLength(7);
+    code->setAlignment(Qt::AlignCenter);
+    layout->addWidget(code);
+    auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
+    auto *confirm = buttons->button(QDialogButtonBox::Ok);
+    confirm->setText("Join");
+    confirm->setProperty("primary", true);
+    confirm->style()->polish(confirm);
+    confirm->setEnabled(false);
+    connect(code, &QLineEdit::textEdited, &dialog, [code, confirm](const QString &text) {
+        QString clean;
+        for (const QChar letter : text.toUpper())
+            if (letter.isLetterOrNumber() && clean.size() < 6) clean += letter;
+        const QString shown = clean.size() > 3 ? clean.left(3) + "-" + clean.mid(3) : clean;
+        if (shown != text) code->setText(shown);
+        confirm->setEnabled(!Tunnel::normalize(shown).isEmpty());
+    });
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addWidget(buttons);
+    code->setFocus();
+    if (dialog.exec() != QDialog::Accepted) return;
+    const QString address = Tunnel::address(Tunnel::normalize(code->text()));
+    if (!find(address)) keepServer(address, QString());
+    m_search->clear();
+    m_list->setCurrentItem(find(address));
+    join();
+}
+
 void ServersPage::resolve(QStringList candidates, std::function<void(const QString &)> done)
 {
     if (candidates.isEmpty()) {
@@ -460,7 +551,8 @@ void ServersPage::keepServer(const QString &address, const QString &name)
 {
     auto servers = Settings::servers();
     auto it = std::find_if(servers.begin(), servers.end(), [&](const GameServer &s) { return s.address == address; });
-    const QString title = titleText(name.isEmpty() ? QUrl(address).host() : name);
+    const QString fallback = Tunnel::isAddress(address) ? shortAddress(address) : QUrl(address).host();
+    const QString title = titleText(name.isEmpty() ? fallback : name);
     if (it == servers.end()) servers.append({title, address, {}, {}});
     else it->name = title;
     Settings::setServers(servers);
