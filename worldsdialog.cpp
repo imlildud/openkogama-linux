@@ -2,6 +2,7 @@
 #include "ui_worldsdialog.h"
 #include "launchdialog.h"
 #include "gamelauncher.h"
+#include "playerprofile.h"
 #include "centereddelegate.h"
 #include "tilegrid.h"
 #include "webplayerruntime.h"
@@ -689,6 +690,8 @@ void WorldsDialog::activateAvatar(int avatar, std::function<void()> done) {
         bool ok = reply->error() == QNetworkReply::NoError;
         if (!ok)
             QMessageBox::warning(this, "Avatars", "Could not switch to this avatar");
+        else
+            PlayerProfile::refresh(this);
         loadAvatars(avatar);
         if (ok && done) done();
     });

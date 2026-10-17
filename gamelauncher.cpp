@@ -1,6 +1,7 @@
 #include "gamelauncher.h"
 #include "launchdialog.h"
 #include "paths.h"
+#include "playerprofile.h"
 #include "webplayerruntime.h"
 #include "consolewindow.h"
 #include "settings.h"
@@ -13,6 +14,7 @@
 #include <QMessageBox>
 #include <QProcess>
 #include <QUrl>
+#include <QUuid>
 #include <QWidget>
 
 static QString instanceTitle(const QString &path)
@@ -59,6 +61,8 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         session += "&name=" + QString::fromLatin1(QUrl::toPercentEncoding(nickname));
     if (viaCode)
         session += "&local=" + QString::number(LocalHttpPort);
+    const QString settingsKey = QUuid::createUuid().toString(QUuid::Id128);
+    session += "&key=" + settingsKey;
 
     auto *client = new QProcess(owner);
     QDir logs(QDir(path).filePath("logs"));
@@ -121,7 +125,9 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         if (!console->isVisible())
             console->deleteLater();
     });
+    QObject::connect(client, &QProcess::finished, client, [url, settingsKey, local, owner]() { PlayerProfile::keep(url, settingsKey, local, owner); });
     QObject::connect(client, &QProcess::finished, client, &QObject::deleteLater);
+    PlayerProfile::send(url, settingsKey, !local);
     client->start();
 
     if (!client->waitForStarted()) {

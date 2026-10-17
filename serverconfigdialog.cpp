@@ -5,10 +5,12 @@
 #include <QDir>
 #include <QFile>
 #include <QFontDatabase>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QLabel>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QStyle>
 #include <QUrl>
@@ -23,19 +25,24 @@ const QString Starter = R"({
     "clients": [],
     "mixedClients": false,
     "keepPlayChanges": false,
-    "public": false
+    "public": false,
+    "playerSettings": true,
+    "playerAvatars": true,
+    "playerInventory": true
 }
 )";
+const QList<QPair<QString, bool>> Defaults = {
+    {"public", false}, {"playerSettings", true}, {"playerAvatars", true}, {"playerInventory", true}};
 
 QString configPath()
 {
     return QDir(Paths::serverData()).filePath("server.json");
 }
 
-QString withPublic(const QString &text)
+QString withKey(const QString &text, const QString &name, const QString &value)
 {
     const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8());
-    if (!document.isObject() || document.object().contains("public")) return text;
+    if (!document.isObject() || document.object().contains(name)) return text;
     const qsizetype end = text.lastIndexOf('}');
     qsizetype last = end - 1;
     while (last > 0 && text[last].isSpace()) --last;
@@ -46,8 +53,46 @@ QString withPublic(const QString &text)
         if (line > 0 && before.trimmed().isEmpty()) indent = before;
     }
     const QString comma = text[last] == '{' ? QString() : QString(",");
-    return text.left(last + 1) + comma + "\n" + indent + "\"public\": false\n" + text.mid(end);
+    return text.left(last + 1) + comma + "\n" + indent + "\"" + name + "\": " + value + "\n" + text.mid(end);
 }
+
+QString withDefaults(QString text)
+{
+    for (const auto &[name, value] : Defaults)
+        text = withKey(text, name, value ? "true" : "false");
+    return text;
+}
+
+QString jsonList(const QStringList &values)
+{
+    QStringList quoted;
+    for (const QString &value : values)
+        quoted << "\"" + value + "\"";
+    return "[" + quoted.join(", ") + "]";
+}
+}
+
+QStringList ServerConfigDialog::admins()
+{
+    QStringList list;
+    for (const QJsonValue &value : current().value("admins").toArray())
+        if (value.isString()) list << value.toString();
+    return list;
+}
+
+bool ServerConfigDialog::setAdmins(const QStringList &admins)
+{
+    QFile file(configPath());
+    QString text = file.open(QIODevice::ReadOnly) ? QString::fromUtf8(file.readAll()) : Starter;
+    file.close();
+    const QJsonDocument document = QJsonDocument::fromJson(text.toUtf8());
+    if (!document.isObject()) return false;
+    static const QRegularExpression listed(R"("admins"\s*:\s*\[[^\]]*\])");
+    text = document.object().contains("admins") ? text.replace(listed, "\"admins\": " + jsonList(admins)) : withKey(text, "admins", jsonList(admins));
+    if (QJsonDocument::fromJson(text.toUtf8()).object().value("admins").toArray() != QJsonArray::fromStringList(admins)) return false;
+    QDir().mkpath(Paths::serverData());
+    QSaveFile saved(configPath());
+    return saved.open(QIODevice::WriteOnly) && saved.write(text.toUtf8()) >= 0 && saved.commit();
 }
 
 QJsonObject ServerConfigDialog::current()
@@ -76,7 +121,7 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent)
     m_text->setFont(mono);
     m_text->setLineWrapMode(QPlainTextEdit::NoWrap);
     QFile file(configPath());
-    m_text->setPlainText(file.open(QIODevice::ReadOnly) ? withPublic(QString::fromUtf8(file.readAll())) : Starter);
+    m_text->setPlainText(file.open(QIODevice::ReadOnly) ? withDefaults(QString::fromUtf8(file.readAll())) : Starter);
     layout->addWidget(m_text, 1);
     m_error->setObjectName("serverConfigError");
     m_error->setWordWrap(true);

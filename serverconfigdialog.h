@@ -13,6 +13,8 @@ class ServerConfigDialog : public QDialog
 public:
     explicit ServerConfigDialog(QWidget *parent = nullptr);
     static QJsonObject current();
+    static QStringList admins();
+    static bool setAdmins(const QStringList &admins);
 
 private:
     void save();

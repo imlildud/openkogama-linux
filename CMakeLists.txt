@@ -18,12 +18,14 @@ qt_add_executable(openkogama-launcher
     assetinstaller.h assetinstaller.cpp
     worldsdialog.h worldsdialog.cpp worldsdialog.ui
     gamelauncher.h gamelauncher.cpp
+    playerprofile.h playerprofile.cpp
     discordpresence.h discordpresence.cpp
     links.h links.cpp
     serverspage.h serverspage.cpp
     tunnel.h tunnel.cpp
     sharebar.h sharebar.cpp
     serverconfigdialog.h serverconfigdialog.cpp
+    admindialog.h admindialog.cpp
     tilegrid.h tilegrid.cpp
     webplayerruntime.h webplayerruntime.cpp
     paths.h paths.cpp
@@ -104,7 +106,7 @@ include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
     qt_add_executable(launcher-tests tests/serverspage_test.cpp serverspage.cpp serverspage.h tilegrid.cpp tilegrid.h settings.cpp settings.h tunnel.cpp tunnel.h sharebar.cpp sharebar.h serverconfigdialog.cpp serverconfigdialog.h
-        gamelauncher.cpp gamelauncher.h discordpresence.cpp discordpresence.h consolewindow.cpp consolewindow.h webplayerruntime.cpp webplayerruntime.h paths.cpp paths.h theme.cpp theme.h
+        gamelauncher.cpp gamelauncher.h playerprofile.cpp playerprofile.h discordpresence.cpp discordpresence.h consolewindow.cpp consolewindow.h webplayerruntime.cpp webplayerruntime.h paths.cpp paths.h theme.cpp theme.h
         launchdialog.cpp launchdialog.h launchdialog.ui assetinstaller.cpp assetinstaller.h)
     target_include_directories(launcher-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(launcher-tests PRIVATE Qt::Widgets Qt::Network Qt::Test Qt::CorePrivate)

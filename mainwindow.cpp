@@ -1,4 +1,5 @@
 #include "mainwindow.h"
+#include "admindialog.h"
 #include "ui_mainwindow.h"
 #include "installdialog.h"
 #include "installprogressdialog.h"
@@ -152,6 +153,9 @@ MainWindow::MainWindow(QWidget *parent)
     auto *serverSettings = new QAction("Server settings...", this);
     connect(serverSettings, &QAction::triggered, this, &MainWindow::editServerSettings);
     ui->menuFile->addAction(serverSettings);
+    auto *admin = new QAction("Admin...", this);
+    connect(admin, &QAction::triggered, this, [this]() { AdminDialog(this).exec(); });
+    ui->menuFile->addAction(admin);
     connect(m_share, &ShareBar::settingsRequested, this, &MainWindow::editServerSettings);
     m_net = new QNetworkAccessManager(this);
     ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
