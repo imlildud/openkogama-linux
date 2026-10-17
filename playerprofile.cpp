@@ -15,6 +15,7 @@ namespace {
 
 constexpr int SendTimeout = 5000;
 constexpr int FetchTimeout = 5000;
+constexpr int ExportTimeout = 3000;
 
 QString folder()
 {
@@ -63,6 +64,26 @@ void fetch(const QString &address, QObject *owner, const std::function<void(cons
     });
 }
 
+void keepExport(const QJsonObject &profile)
+{
+    write("avatar", profile.value("avatar"));
+    write("inventory", profile.value("inventory"));
+}
+
+void exportNow()
+{
+    QNetworkAccessManager net;
+    QNetworkRequest request{QUrl(LocalServerUrl + "/api/profile/export")};
+    request.setTransferTimeout(ExportTimeout);
+    QNetworkReply *reply = net.get(request);
+    QEventLoop loop;
+    QObject::connect(reply, &QNetworkReply::finished, &loop, &QEventLoop::quit);
+    loop.exec(QEventLoop::ExcludeUserInputEvents);
+    const QJsonDocument document = QJsonDocument::fromJson(reply->readAll());
+    if (reply->error() == QNetworkReply::NoError && document.isObject())
+        keepExport(document.object());
+}
+
 }
 
 namespace PlayerProfile {
@@ -71,6 +92,7 @@ void send(const QString &url, const QString &key, bool everything)
 {
     QJsonObject package{{"settings", read("settings")}};
     if (everything) {
+        exportNow();
         package["avatar"] = read("avatar");
         package["inventory"] = read("inventory");
     }
@@ -99,10 +121,7 @@ void keep(const QString &url, const QString &key, bool local, QObject *owner)
 
 void refresh(QObject *owner)
 {
-    fetch(LocalServerUrl + "/api/profile/export", owner, [](const QJsonObject &profile) {
-        write("avatar", profile.value("avatar"));
-        write("inventory", profile.value("inventory"));
-    });
+    fetch(LocalServerUrl + "/api/profile/export", owner, keepExport);
 }
 
 }
