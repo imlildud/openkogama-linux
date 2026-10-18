@@ -52,7 +52,7 @@ jobs:
       - name: player
         shell: cmd
         run: |
-          cmake -S openkogama-player -B build/player -G Ninja -DCMAKE_BUILD_TYPE=Release || exit /b 1
+          cmake -S openkogama-player -B build/player -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=cl || exit /b 1
           cmake --build build/player || exit /b 1
           mkdir dist\player
           copy build\player\openkogama-player.exe dist\player\ || exit /b 1
