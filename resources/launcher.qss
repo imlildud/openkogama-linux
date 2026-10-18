@@ -70,7 +70,7 @@ QTabBar::tab {
     background: transparent;
     border: none;
     border-bottom: 2px solid transparent;
-    padding: 5px 0;
+    padding: 6px 0;
     margin-right: 16px;
     color: @muted@;
 }
@@ -83,7 +83,7 @@ QListView#instancesView::item { padding: 4px 0; }
 QAbstractItemView, QLineEdit, QPlainTextEdit, QTextEdit { selection-background-color: #3a7a80; selection-color: #ffffff; }
 QTreeView { alternate-background-color: @alternate@; }
 
-QLabel#instanceVersionLabel, QLabel#selectedServerAddress { color: @muted@; }
+QLabel#instanceVersionLabel, QLabel#selectedServerAddress, QLabel#selectedItemDetail { color: @muted@; }
 
 QPushButton:default { border-color: @hover-border@; }
 QDialogButtonBox QPushButton { min-width: 58px; }
@@ -91,7 +91,7 @@ QDialogButtonBox QPushButton[primary="true"] { padding-left: 14px; padding-right
 
 QToolButton#addVersionButton { padding: 0; min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; qproperty-icon: url(@plus@); qproperty-iconSize: 12px 12px; }
 QToolButton#moreWorldButton, QToolButton#moreAvatarButton,
-QToolButton#moreVersionButton, QToolButton#moreServerButton { padding: 0; min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }
+QToolButton#moreVersionButton, QToolButton#moreServerButton, QToolButton#moreItemButton { padding: 0; min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px; }
 
 QMenuBar { background: transparent; }
 QMenuBar::item { padding: 4px 8px; background: transparent; border-radius: 4px; }

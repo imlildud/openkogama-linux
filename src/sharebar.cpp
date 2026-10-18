@@ -92,6 +92,7 @@ void ShareBar::share(int world, const QString &name, const QString &version)
     start();
     refresh();
     show();
+    emit hostedWorldChanged(m_world);
 }
 
 void ShareBar::setVersion(const QString &version)
@@ -128,6 +129,7 @@ void ShareBar::stop()
     m_error.clear();
     m_players = 0;
     hide();
+    emit hostedWorldChanged(0);
 }
 
 void ShareBar::start()
@@ -223,6 +225,7 @@ void ShareBar::ended()
     m_players = 0;
     if (m_error.isEmpty()) m_error = "hosting stopped unexpectedly";
     refresh();
+    emit hostedWorldChanged(0);
 }
 
 void ShareBar::refresh()

@@ -10,6 +10,7 @@
 #include <QJsonObject>
 #include <QNetworkReply>
 #include <QRandomGenerator>
+#include <QRegularExpression>
 #include <QTcpServer>
 #include <QTimer>
 #include <QUdpSocket>
@@ -50,9 +51,14 @@ static int freePort(bool udp) {
     return 0;
 }
 
-static void choosePorts(bool fresh) {
-    const int http = !fresh && tcpFree(DefaultHttpPort) ? DefaultHttpPort : freePort(false);
-    int photon = !fresh && tcpFree(DefaultPhotonPort) && udpFree(DefaultPhotonPort) ? DefaultPhotonPort : freePort(true);
+static void choosePorts(bool retry, int busy) {
+    const bool both = busy != LocalHttpPort && busy != LocalPhotonPort;
+    int http = LocalHttpPort;
+    if (!retry || both || busy == LocalHttpPort)
+        http = !retry && tcpFree(DefaultHttpPort) ? DefaultHttpPort : freePort(false);
+    int photon = LocalPhotonPort;
+    if (!retry || both || busy == LocalPhotonPort)
+        photon = !retry && tcpFree(DefaultPhotonPort) && udpFree(DefaultPhotonPort) ? DefaultPhotonPort : freePort(true);
     if (photon == http) photon = freePort(true);
     if (http > 0) LocalHttpPort = http;
     if (photon > 0) LocalPhotonPort = photon;
@@ -72,6 +78,12 @@ static QString lastServerError() {
         if (at >= 0) return line->mid(at + 7).trimmed();
     }
     return {};
+}
+
+static int busyPort() {
+    static const QRegularExpression busy("port (\\d+) is used by another program");
+    const QRegularExpressionMatch match = busy.match(lastServerError());
+    return match.hasMatch() ? match.captured(1).toInt() : 0;
 }
 
 LaunchDialog::LaunchDialog(const QString &version, QWidget *parent)
@@ -137,7 +149,7 @@ void LaunchDialog::startServer() {
 
     setStep("Starting server...", AssetsEnd + 5);
     QDir().mkpath(Paths::serverData());
-    choosePorts(m_retried);
+    choosePorts(m_retried, m_retried ? busyPort() : 0);
     QStringList arguments{"--http", QString::number(LocalHttpPort), "--photon", QString::number(LocalPhotonPort)};
     if (m_offline) arguments.append("--offline");
     m_exitCode = 0;

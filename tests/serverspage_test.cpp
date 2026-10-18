@@ -35,6 +35,8 @@
 #include <QTemporaryDir>
 #include <QTextStream>
 #include <QThread>
+#include <QUrl>
+#include <QUrlQuery>
 
 class MockServer : public QTcpServer
 {
@@ -248,7 +250,13 @@ private slots:
         QFile result(capture);
         QVERIFY(result.open(QIODevice::ReadOnly));
         const QJsonObject launched = QJsonDocument::fromJson(result.readAll()).object();
-        QCOMPARE(launched.value("session").toString(), QString("http://127.0.0.1:8080/session?mode=play&client=2015&unity=5.2"));
+        const QUrl session(launched.value("session").toString());
+        const QUrlQuery query(session);
+        QCOMPARE(session.toString(QUrl::RemoveQuery), QString("http://127.0.0.1:8080/session"));
+        QCOMPARE(query.queryItemValue("mode"), QString("play"));
+        QCOMPARE(query.queryItemValue("client"), QString("2015"));
+        QCOMPARE(query.queryItemValue("unity"), QString("5.2"));
+        QVERIFY(!query.queryItemValue("key").isEmpty());
         QCOMPARE(launched.value("cwd").toString(), instance.path());
         QTRY_VERIFY(!client || client->state() == QProcess::NotRunning);
     }

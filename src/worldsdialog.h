@@ -24,7 +24,10 @@ public:
     bool hasRunningGames() const;
     QWidget *worldsPage() const;
     QWidget *avatarsPage() const;
+    QWidget *inventoryPage() const;
     void showAvatars();
+    void showInventory();
+    void setHostedWorld(int world);
     void reject() override;
 
 signals:
@@ -39,6 +42,7 @@ private:
     void filterWorlds();
     void updateWorldActions();
     void updateAvatarActions();
+    void filterAvatars();
     void loadTemplates();
     void loadThumbnail(QListWidgetItem *item, int world);
     void checkRevision();
@@ -54,6 +58,7 @@ private:
     void showWorldMenu(const QPoint &pos);
     QProcess *launch(const QString &mode, int world);
     int selectedWorld() const;
+    QString hostedMode(int world) const;
     void loadAvatars(int select = 0);
     void loadAvatarPicture(QListWidgetItem *item, int avatar, const QString &version);
     void useAvatar();
@@ -64,8 +69,22 @@ private:
     void exportAvatar();
     void renameAvatar();
     void onAvatarRenamed(QListWidgetItem *item);
+    void deleteAvatar();
     void showAvatarMenu(const QPoint &pos);
     int selectedAvatar() const;
+    void loadInventory(int select = 0);
+    void loadItemPicture(QListWidgetItem *item, int itemId);
+    void filterInventory();
+    void updateInventoryActions();
+    void importModel();
+    void importModels(QStringList paths, const QString &scale, QStringList failed);
+    void exportItem();
+    void renameItem();
+    void scaleItem();
+    void onItemRenamed(QListWidgetItem *item);
+    void deleteItem();
+    void showItemMenu(const QPoint &pos);
+    int selectedItem() const;
 
     Ui::WorldsDialog *ui;
     QPointer<QWidget> m_owner;
@@ -76,6 +95,7 @@ private:
     QNetworkAccessManager *m_net;
     QList<QPair<QString, QString>> m_templates;
     int m_revision = -1;
+    int m_hostedWorld = 0;
     bool m_hasAvatarEditor = true;
     QList<QPointer<QProcess>> m_clients;
 };

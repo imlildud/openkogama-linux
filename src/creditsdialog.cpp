@@ -96,6 +96,7 @@ CreditsDialog::CreditsDialog(QWidget *parent)
     }
 
     layout->addSpacing(16);
+    layout->addStretch();
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Close, this);
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     layout->addWidget(buttons);

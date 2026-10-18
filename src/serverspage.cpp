@@ -677,7 +677,7 @@ void ServersPage::joinWithCode()
 {
     QDialog dialog(this);
     dialog.setWindowTitle("Join with code");
-    dialog.setMinimumWidth(360);
+    dialog.setMinimumWidth(380);
     auto *layout = new QVBoxLayout(&dialog);
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(10);
@@ -706,6 +706,7 @@ void ServersPage::joinWithCode()
     });
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    layout->addStretch();
     layout->addWidget(buttons);
     code->setFocus();
     if (dialog.exec() != QDialog::Accepted) return;

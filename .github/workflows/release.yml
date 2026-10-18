@@ -38,8 +38,9 @@ jobs:
           path: openkogama-photon
       - uses: jurplel/install-qt-action@v4
         with:
-          version: 6.10.2
-          arch: win64_msvc2022_64
+          version: 6.11.2
+          arch: win64_mingw
+          tools: tools_mingw1310
           cache: true
       - uses: actions/setup-dotnet@v4
         with:
@@ -57,13 +58,11 @@ jobs:
           copy build\player\openkogama-player.exe dist\player\ || exit /b 1
           xcopy /e /i /q build\player\versions dist\player\versions || exit /b 1
 
-      - uses: ilammy/msvc-dev-cmd@v1
-        with:
-          arch: x64
       - name: launcher
         shell: cmd
         run: |
-          cmake -S openkogama-launcher -B build/launcher -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_BINDIR=. || exit /b 1
+          set PATH=%IQTA_TOOLS%\mingw1310_64\bin;%PATH%
+          cmake -S openkogama-launcher -B build/launcher -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_INSTALL_BINDIR=. || exit /b 1
           cmake --build build/launcher || exit /b 1
           cmake --install build/launcher --prefix "%CD%\dist" || exit /b 1
 
@@ -75,13 +74,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          Copy-Item openkogama-launcher/LICENSE.txt dist/
+          Copy-Item openkogama-launcher/LICENSE dist/LICENSE.txt
           dotnet tool install -g vpk --version 1.2.161
           $version = $env:TAG.TrimStart("v")
           $pre = @()
           if ($version -match "-") { $pre = @("--pre") }
           vpk download github --repoUrl $env:REPO_URL --token $env:GH_TOKEN -o releases @pre
-          vpk pack --packId OpenKogamaLauncher --packVersion $version --packDir dist --mainExe openkogama-launcher.exe --packTitle "OpenKogama Launcher" --packAuthors OpenKogama --icon openkogama-launcher/openkogama.ico -o releases
+          vpk pack --packId OpenKogamaLauncher --packVersion $version --packDir dist --mainExe openkogama-launcher.exe --packTitle "OpenKogama Launcher" --packAuthors OpenKogama --icon openkogama-launcher/resources/openkogama.ico -o releases
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@v4
         with:

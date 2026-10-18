@@ -254,6 +254,25 @@
         </property>
        </layout>
       </widget>
+      <widget class="QWidget" name="inventoryTab">
+       <attribute name="title">
+        <string>&amp;Inventory</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="inventoryLayout">
+        <property name="leftMargin">
+         <number>0</number>
+        </property>
+        <property name="topMargin">
+         <number>8</number>
+        </property>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+       </layout>
+      </widget>
       <widget class="QWidget" name="versionsTab">
        <attribute name="title">
         <string>Ve&amp;rsions</string>
@@ -274,6 +293,29 @@
         <property name="spacing">
          <number>8</number>
         </property>
+        <item>
+         <widget class="QLineEdit" name="versionSearchLineEdit">
+          <property name="placeholderText">
+           <string>Search your versions...</string>
+          </property>
+          <property name="accessibleName">
+           <string>Search your versions</string>
+          </property>
+          <property name="clearButtonEnabled">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="versionStatusLabel">
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+          <property name="textFormat">
+           <enum>Qt::PlainText</enum>
+          </property>
+         </widget>
+        </item>
         <item>
          <widget class="QWidget" name="noVersionsPage">
           <layout class="QVBoxLayout" name="noVersionsLayout">

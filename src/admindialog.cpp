@@ -16,6 +16,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QPushButton>
+#include <QStyle>
 #include <QTabWidget>
 #include <QTimer>
 #include <QTreeWidget>
@@ -235,22 +236,30 @@ void AdminDialog::ban()
 
     QDialog dialog(this);
     dialog.setWindowTitle("Ban " + item->text(0));
-    auto *form = new QFormLayout(&dialog);
-    form->setContentsMargins(12, 12, 12, 12);
-    form->setSpacing(10);
+    dialog.setMinimumWidth(380);
     auto *duration = new QComboBox(&dialog);
     for (const auto &[label, hours] : Durations)
         duration->addItem(label, hours);
     duration->setCurrentIndex(1);
     auto *reason = new QLineEdit(&dialog);
     reason->setMaxLength(200);
-    form->addRow("For", duration);
-    form->addRow("Reason", reason);
+    auto *layout = new QVBoxLayout(&dialog);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(10);
+    auto *form = new QFormLayout;
+    form->setSpacing(8);
+    form->addRow("For:", duration);
+    form->addRow("Reason:", reason);
+    layout->addLayout(form);
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, &dialog);
-    buttons->button(QDialogButtonBox::Ok)->setText("Ban");
+    auto *confirm = buttons->button(QDialogButtonBox::Ok);
+    confirm->setText("Ban");
+    confirm->setProperty("primary", true);
+    confirm->style()->polish(confirm);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    form->addRow(buttons);
+    layout->addStretch();
+    layout->addWidget(buttons);
     if (dialog.exec() != QDialog::Accepted) return;
 
     QUrlQuery query;

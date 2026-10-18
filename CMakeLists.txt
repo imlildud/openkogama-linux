@@ -7,54 +7,56 @@ qt_standard_project_setup()
 
 qt_add_executable(openkogama-launcher
     WIN32 MACOSX_BUNDLE
-    main.cpp
-    mainwindow.cpp
-    mainwindow.h
-    mainwindow.ui
-    app.rc
-    installdialog.h installdialog.cpp installdialog.ui
-    installprogressdialog.h installprogressdialog.cpp installprogressdialog.ui
-    launchdialog.h launchdialog.cpp launchdialog.ui
-    assetinstaller.h assetinstaller.cpp
-    worldsdialog.h worldsdialog.cpp worldsdialog.ui
-    gamelauncher.h gamelauncher.cpp
-    playerprofile.h playerprofile.cpp
-    discordpresence.h discordpresence.cpp
-    links.h links.cpp
-    serverspage.h serverspage.cpp
-    tunnel.h tunnel.cpp
-    sharebar.h sharebar.cpp
-    serverconfigdialog.h serverconfigdialog.cpp
-    admindialog.h admindialog.cpp
-    tilegrid.h tilegrid.cpp
-    webplayerruntime.h webplayerruntime.cpp
-    paths.h paths.cpp
-    updater.h updater.cpp
-    theme.h theme.cpp
-    settings.h settings.cpp
-    settingsdialog.h settingsdialog.cpp settingsdialog.ui
-    consolewindow.h consolewindow.cpp
-    centereddelegate.h
-    creditsdialog.h creditsdialog.cpp
-    lemonplus.png
+    src/main.cpp
+    src/mainwindow.cpp
+    src/mainwindow.h
+    src/mainwindow.ui
+    resources/app.rc
+    src/installdialog.h src/installdialog.cpp src/installdialog.ui
+    src/installprogressdialog.h src/installprogressdialog.cpp src/installprogressdialog.ui
+    src/launchdialog.h src/launchdialog.cpp src/launchdialog.ui
+    src/assetinstaller.h src/assetinstaller.cpp
+    src/worldsdialog.h src/worldsdialog.cpp src/worldsdialog.ui
+    src/gamelauncher.h src/gamelauncher.cpp
+    src/playerprofile.h src/playerprofile.cpp
+    src/discordpresence.h src/discordpresence.cpp
+    src/links.h src/links.cpp
+    src/serverspage.h src/serverspage.cpp
+    src/tunnel.h src/tunnel.cpp
+    src/sharebar.h src/sharebar.cpp
+    src/serverconfigdialog.h src/serverconfigdialog.cpp
+    src/admindialog.h src/admindialog.cpp
+    src/tilegrid.h src/tilegrid.cpp
+    src/modelpreview.h src/modelpreview.cpp
+    src/webplayerruntime.h src/webplayerruntime.cpp
+    src/paths.h src/paths.cpp
+    src/updater.h src/updater.cpp
+    src/theme.h src/theme.cpp
+    src/settings.h src/settings.cpp
+    src/settingsdialog.h src/settingsdialog.cpp src/settingsdialog.ui
+    src/consolewindow.h src/consolewindow.cpp
+    src/centereddelegate.h
+    src/creditsdialog.h src/creditsdialog.cpp
 )
 
 qt_add_resources(openkogama-launcher "resources"
     PREFIX "/"
-    FILES versions.json
-    FILES discord.png
-    FILES install.png
-    FILES unknown.png
-    FILES launch.png
-    FILES lemonplus.png
-    FILES logo.png
-    FILES openkogama-font.ttf
-    FILES launcher.qss
-    FILES arrow-down.svg
-    FILES check.svg
-    FILES plus.svg
-    FILES plus-light.svg
-    FILES arrow-down-light.svg
+    BASE resources
+    FILES
+        resources/versions.json
+        resources/discord.png
+        resources/install.png
+        resources/unknown.png
+        resources/launch.png
+        resources/lemonplus.png
+        resources/logo.png
+        resources/openkogama-font.ttf
+        resources/launcher.qss
+        resources/arrow-down.svg
+        resources/check.svg
+        resources/plus.svg
+        resources/plus-light.svg
+        resources/arrow-down-light.svg
 )
 
 include(FetchContent)
@@ -105,12 +107,12 @@ option(BUILD_TESTING "Build launcher tests" OFF)
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
-    qt_add_executable(launcher-tests tests/serverspage_test.cpp serverspage.cpp serverspage.h tilegrid.cpp tilegrid.h settings.cpp settings.h tunnel.cpp tunnel.h sharebar.cpp sharebar.h serverconfigdialog.cpp serverconfigdialog.h
-        gamelauncher.cpp gamelauncher.h playerprofile.cpp playerprofile.h discordpresence.cpp discordpresence.h consolewindow.cpp consolewindow.h webplayerruntime.cpp webplayerruntime.h paths.cpp paths.h theme.cpp theme.h
-        launchdialog.cpp launchdialog.h launchdialog.ui assetinstaller.cpp assetinstaller.h)
-    target_include_directories(launcher-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    qt_add_executable(launcher-tests tests/serverspage_test.cpp src/serverspage.cpp src/serverspage.h src/tilegrid.cpp src/tilegrid.h src/settings.cpp src/settings.h src/tunnel.cpp src/tunnel.h src/sharebar.cpp src/sharebar.h src/serverconfigdialog.cpp src/serverconfigdialog.h
+        src/gamelauncher.cpp src/gamelauncher.h src/playerprofile.cpp src/playerprofile.h src/discordpresence.cpp src/discordpresence.h src/consolewindow.cpp src/consolewindow.h src/webplayerruntime.cpp src/webplayerruntime.h src/paths.cpp src/paths.h src/theme.cpp src/theme.h
+        src/launchdialog.cpp src/launchdialog.h src/launchdialog.ui src/assetinstaller.cpp src/assetinstaller.h)
+    target_include_directories(launcher-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(launcher-tests PRIVATE Qt::Widgets Qt::Network Qt::Test Qt::CorePrivate)
-    qt_add_resources(launcher-tests "test_resources" PREFIX "/" FILES logo.png)
+    qt_add_resources(launcher-tests "test_resources" PREFIX "/" BASE resources FILES resources/logo.png)
     add_test(NAME launcher-servers COMMAND launcher-tests -o ${CMAKE_CURRENT_BINARY_DIR}/launcher-tests.txt,txt)
     set_tests_properties(launcher-servers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endif()

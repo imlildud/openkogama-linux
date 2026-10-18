@@ -111,7 +111,7 @@ ServerConfigDialog::ServerConfigDialog(QWidget *parent)
     layout->setContentsMargins(12, 12, 12, 12);
     layout->setSpacing(10);
     auto *hint = new QLabel(QString("The server.json of the server on this computer, which hosted worlds follow. "
-        "Saving restarts the server. <a href=\"%1\">All settings</a>").arg(QLatin1String(Reference)), this);
+        "Saving restarts the server. <a href=\"%1\" style=\"color: #3a7a80; text-decoration: none;\">All settings</a>").arg(QLatin1String(Reference)), this);
     hint->setWordWrap(true);
     hint->setOpenExternalLinks(true);
     layout->addWidget(hint);

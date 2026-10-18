@@ -17,6 +17,7 @@ inline const QSize SquareTile(120, 120);
 
 void setup(QListWidget *list, QObject *resizeFilter);
 void fit(QListWidget *list, const QSize &tile);
+QPixmap backdrop(const QSize &size, const QColor &background);
 QPixmap placeholder(const QSize &size, const QColor &background);
 QPixmap cover(const QPixmap &image, const QSize &size);
 QIcon icon(const QPixmap &pixmap);

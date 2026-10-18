@@ -47,6 +47,7 @@ private slots:
 private:
     void loadInstances(const QString &selectPath = {});
     void updateInstanceActions();
+    void filterInstances();
     void updatePlayPage();
     void onVersionChanged();
     void fetchVersions(std::function<void()> done = nullptr);

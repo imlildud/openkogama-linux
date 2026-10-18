@@ -20,8 +20,10 @@ public:
     void stop();
     void restart();
     int players() const { return m_players; }
+    int hostedWorld() const { return m_tunnel ? m_world : 0; }
 
 signals:
+    void hostedWorldChanged(int world);
     void settingsRequested();
     void listed(const QString &address, const QString &title);
 

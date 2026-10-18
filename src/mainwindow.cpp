@@ -159,6 +159,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_share, &ShareBar::settingsRequested, this, &MainWindow::editServerSettings);
     m_net = new QNetworkAccessManager(this);
     ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), false);
+    ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->inventoryTab), false);
     connect(ui->actionInstall, &QAction::triggered, this, &MainWindow::onInstallTriggered);
     connect(ui->actionDiscord, &QAction::triggered, this, &MainWindow::onDiscordTriggered);
     connect(ui->actionCredits, &QAction::triggered, this, [this]() { CreditsDialog(this).exec(); });
@@ -200,10 +201,13 @@ MainWindow::MainWindow(QWidget *parent)
         if (launchInstance(index.data(Qt::UserRole).toString()))
             ui->mainTabs->setCurrentWidget(ui->playTab);
     });
+    connect(ui->versionSearchLineEdit, &QLineEdit::textChanged, this, [this]() { filterInstances(); });
     connect(ui->versionCombo, &QComboBox::currentIndexChanged, this, [this]() { onVersionChanged(); });
     connect(ui->mainTabs, &QTabWidget::currentChanged, this, [this]() {
         if (m_worlds && ui->mainTabs->currentWidget() == ui->avatarsTab)
             m_worlds->showAvatars();
+        if (m_worlds && ui->mainTabs->currentWidget() == ui->inventoryTab)
+            m_worlds->showInventory();
         updateInstanceActions();
     });
 
@@ -283,10 +287,35 @@ void MainWindow::loadInstances(const QString &selectPath) {
     }
     ui->versionCombo->setEnabled(selected >= 0);
     ui->noVersionsPage->setVisible(selected < 0);
+    ui->versionSearchLineEdit->setVisible(selected >= 0);
     ui->instancesView->setVisible(selected >= 0);
     ui->selectedVersionGroup->setVisible(selected >= 0);
-    updateInstanceActions();
+    filterInstances();
     updatePlayPage();
+}
+
+void MainWindow::filterInstances() {
+    const QString search = ui->versionSearchLineEdit->text().trimmed();
+    int first = -1;
+    int visible = 0;
+    for (int row = 0; row < instances->rowCount(); ++row) {
+        const QModelIndex index = instances->index(row, 0);
+        bool matches = index.data(NameRole).toString().contains(search, Qt::CaseInsensitive)
+            || index.data(VersionRole).toString().contains(search, Qt::CaseInsensitive);
+        ui->instancesView->setRowHidden(row, !matches);
+        if (matches) {
+            ++visible;
+            if (first < 0) first = row;
+        }
+    }
+    const QModelIndex current = ui->instancesView->currentIndex();
+    if (!current.isValid() || ui->instancesView->isRowHidden(current.row()))
+        ui->instancesView->setCurrentIndex(first >= 0 ? instances->index(first, 0) : QModelIndex());
+    int total = instances->rowCount();
+    ui->versionSearchLineEdit->setPlaceholderText(total > 0 ? "Search " + QString::number(total) + (total == 1 ? " version..." : " versions...") : "Search your versions...");
+    ui->versionStatusLabel->setText(total > 0 && visible == 0 ? "No versions match your search." : QString());
+    ui->versionStatusLabel->setVisible(!ui->versionStatusLabel->text().isEmpty());
+    updateInstanceActions();
 }
 
 void MainWindow::updateInstanceActions() {
@@ -582,13 +611,18 @@ bool MainWindow::launchInstance(const QString &path) {
             m_hostClient = client;
             m_share->share(world, name, clientVersion(instances->item(ui->versionCombo->currentIndex())));
         });
+        connect(m_share, &ShareBar::hostedWorldChanged, m_worlds, &WorldsDialog::setHostedWorld);
+        m_worlds->setHostedWorld(m_share->hostedWorld());
         m_worlds->setWindowFlags(Qt::Widget);
         m_worlds->hide();
         ui->worldsLayout->addWidget(m_worlds->worldsPage());
         ui->avatarsLayout->addWidget(m_worlds->avatarsPage());
+        ui->inventoryLayout->addWidget(m_worlds->inventoryPage());
         m_worlds->worldsPage()->show();
         m_worlds->avatarsPage()->show();
+        m_worlds->inventoryPage()->show();
         ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->avatarsTab), true);
+        ui->mainTabs->setTabEnabled(ui->mainTabs->indexOf(ui->inventoryTab), true);
     } else {
         m_worlds->setInstance(path, exe, server);
     }

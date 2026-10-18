@@ -43,14 +43,21 @@ void fit(QListWidget *list, const QSize &tile)
     if (list->gridSize() != grid) list->setGridSize(grid);
 }
 
-QPixmap placeholder(const QSize &size, const QColor &background)
+QPixmap backdrop(const QSize &size, const QColor &background)
 {
     QPixmap pixmap(size);
     pixmap.fill(background);
     QPainter painter(&pixmap);
+    painter.fillRect(pixmap.rect(), QColor(0, 0, 0, background.lightness() > 128 ? 15 : 46));
+    return pixmap;
+}
+
+QPixmap placeholder(const QSize &size, const QColor &background)
+{
+    QPixmap pixmap = backdrop(size, background);
+    QPainter painter(&pixmap);
     painter.setRenderHint(QPainter::Antialiasing);
     const bool light = background.lightness() > 128;
-    painter.fillRect(pixmap.rect(), QColor(0, 0, 0, light ? 15 : 46));
     const qreal scale = std::min(size.width(), size.height()) * 0.4 / 24;
     painter.translate((size.width() - 24 * scale) / 2, (size.height() - 24 * scale) / 2);
     painter.scale(scale, scale);
