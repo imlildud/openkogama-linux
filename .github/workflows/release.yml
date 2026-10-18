@@ -46,6 +46,9 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
+      - name: server
+        run: dotnet publish openkogama-server/openkogama-server.csproj -c Release -r win-x64 --self-contained -o dist/server
+
       - uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x86
@@ -65,9 +68,6 @@ jobs:
           cmake -S openkogama-launcher -B build/launcher -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ -DCMAKE_INSTALL_BINDIR=. || exit /b 1
           cmake --build build/launcher || exit /b 1
           cmake --install build/launcher --prefix "%CD%\dist" || exit /b 1
-
-      - name: server
-        run: dotnet publish openkogama-server/openkogama-server.csproj -c Release -r win-x64 --self-contained -o dist/server
 
       - name: package
         shell: pwsh
