@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   windows:
+    environment: release
     runs-on: windows-latest
     env:
       TAG: ${{ inputs.tag }}
