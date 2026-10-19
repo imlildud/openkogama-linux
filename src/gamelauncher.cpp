@@ -1,7 +1,9 @@
 #include "gamelauncher.h"
+#include "clientcontent.h"
 #include "launchdialog.h"
 #include "paths.h"
 #include "playerprofile.h"
+#include "singleinstance.h"
 #include "webplayerruntime.h"
 #include "consolewindow.h"
 #include "settings.h"
@@ -102,6 +104,8 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         if (!unity.isEmpty())
             session += "&unity=" + unity;
         client->setArguments({"kogamaPackage:" + QString::fromLatin1(session.toUtf8().toBase64()), "-logFile", QDir::toNativeSeparators(log)});
+        SingleInstance::release(Paths::instances());
+        ClientContent::prepare(path, url, version);
     }
     client->setWorkingDirectory(path);
     client->setProcessEnvironment(env);
