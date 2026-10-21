@@ -28,12 +28,14 @@ bool installed() {
 }
 
 void registerRuntime() {
+#ifdef Q_OS_WIN
     QSettings settings("HKEY_CURRENT_USER\\Software\\Unity\\WebPlayer", QSettings::NativeFormat);
     if (!settings.value("Directory").toString().isEmpty())
         return;
     settings.setValue("Directory", QDir::toNativeSeparators(runtimeRoot()));
     settings.setValue("UnityWebPlayerReleaseChannel", "Stable");
     settings.setValue("UnityWebPlayerDevelopment", "no");
+#endif
 }
 
 }
