@@ -1,5 +1,6 @@
 #include "clientcontent.h"
 #include "paths.h"
+#include "winexe.h"
 #include <QCursor>
 #include <QDir>
 #include <QEventLoop>
@@ -16,7 +17,10 @@
 #include <QUrlQuery>
 #include <QtEndian>
 
+#ifdef Q_OS_WIN
 static constexpr unsigned long CreateNoWindow = 0x08000000;
+#endif
+
 static constexpr int ContentTimeout = 3000;
 static constexpr int PatchTimeout = 60000;
 static constexpr quint32 CompressionMask = 0x3F;
@@ -75,13 +79,15 @@ QJsonArray sounds(const QString &serverUrl, const QString &version) {
 
 bool patch(const QString &original, const QJsonArray &list, const QString &data) {
     QProcess process;
-    process.setProgram(QDir(Paths::server()).filePath("openkogama-server.exe"));
-    process.setArguments({"client", "patch", original, "-", data});
+    WinExe::setCommand(&process, QDir(Paths::server()).filePath("openkogama-server.exe"),
+        {"client", "patch", original, "-", data});
     process.setWorkingDirectory(Paths::serverData());
     process.setProcessChannelMode(QProcess::MergedChannels);
-    process.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+    #ifdef Q_OS_WIN
+        process.setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;
-    });
+        });
+    #endif
     process.start();
     process.write(QJsonDocument(QJsonObject{{"sounds", list}}).toJson(QJsonDocument::Compact));
     process.closeWriteChannel();
