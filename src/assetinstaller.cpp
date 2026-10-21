@@ -1,11 +1,14 @@
 #include "assetinstaller.h"
 #include "paths.h"
+#include "winexe.h"
 #include <QDir>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 
+#ifdef Q_OS_WIN
 static constexpr unsigned long CreateNoWindow = 0x08000000;
+#endif
 
 AssetInstaller::AssetInstaller(QObject *parent)
     : QObject(parent)
@@ -30,13 +33,14 @@ void AssetInstaller::start(const QString &version) {
 
     QDir().mkpath(Paths::serverData());
     m_process = new QProcess(this);
-    m_process->setProgram(dir.filePath("openkogama-server.exe"));
-    m_process->setArguments({"install", version});
+    WinExe::setCommand(m_process, dir.filePath("openkogama-server.exe"), {"install", version});
     m_process->setWorkingDirectory(Paths::serverData());
     m_process->setProcessChannelMode(QProcess::MergedChannels);
-    m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+    #ifdef Q_OS_WIN
+        m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;
-    });
+        });
+    #endif
     connect(m_process, &QProcess::readyRead, this, &AssetInstaller::readOutput);
     connect(m_process, &QProcess::finished, this, [this](int code, QProcess::ExitStatus status) {
         readOutput();
