@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 project(openkogama-launcher LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core CorePrivate Widgets Network Concurrent)
 
 qt_standard_project_setup()
@@ -11,7 +13,6 @@ qt_add_executable(openkogama-launcher
     src/mainwindow.cpp
     src/mainwindow.h
     src/mainwindow.ui
-    resources/app.rc
     src/installdialog.h src/installdialog.cpp src/installdialog.ui
     src/installprogressdialog.h src/installprogressdialog.cpp src/installprogressdialog.ui
     src/launchdialog.h src/launchdialog.cpp src/launchdialog.ui
@@ -32,14 +33,27 @@ qt_add_executable(openkogama-launcher
     src/modelpreview.h src/modelpreview.cpp
     src/webplayerruntime.h src/webplayerruntime.cpp
     src/paths.h src/paths.cpp
-    src/updater.h src/updater.cpp
+    src/updater.h
     src/theme.h src/theme.cpp
     src/settings.h src/settings.cpp
     src/settingsdialog.h src/settingsdialog.cpp src/settingsdialog.ui
     src/consolewindow.h src/consolewindow.cpp
     src/centereddelegate.h
     src/creditsdialog.h src/creditsdialog.cpp
+    src/winexe.h
+    src/winexe.cpp
 )
+
+if(WIN32)
+    target_sources(openkogama-launcher PRIVATE
+        resources/app.rc
+        src/updater.cpp
+    )
+else()
+    target_sources(openkogama-launcher PRIVATE
+        src/updater_linux.cpp
+    )
+endif()
 
 qt_add_resources(openkogama-launcher "resources"
     PREFIX "/"
@@ -61,21 +75,39 @@ qt_add_resources(openkogama-launcher "resources"
         resources/arrow-down-light.svg
 )
 
-include(FetchContent)
-FetchContent_Declare(velopack
-    URL https://github.com/velopack/velopack/releases/download/1.2.161/velopack_libc_1.2.161.zip
-    URL_HASH SHA256=31de8f2cf05a47bd5328a9f98b0c41aec1582156f6075f1058b26941f7f17c20
-    DOWNLOAD_EXTRACT_TIMESTAMP ON
-)
-FetchContent_MakeAvailable(velopack)
-configure_file(${velopack_SOURCE_DIR}/lib/velopack_libc_win_x64_msvc.dll ${CMAKE_CURRENT_BINARY_DIR}/velopack_libc.dll COPYONLY)
+if(WIN32)
+    include(FetchContent)
 
-add_library(velopack SHARED IMPORTED)
-set_target_properties(velopack PROPERTIES
-    IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/velopack_libc.dll
-    IMPORTED_IMPLIB ${velopack_SOURCE_DIR}/lib/velopack_libc_win_x64_msvc.dll.lib
-    INTERFACE_INCLUDE_DIRECTORIES ${velopack_SOURCE_DIR}/include
-)
+    FetchContent_Declare(velopack
+        URL https://github.com/velopack/velopack/releases/download/1.2.161/velopack_libc_1.2.161.zip
+        URL_HASH SHA256=31de8f2cf05a47bd5328a9f98b0c41aec1582156f6075f1058b26941f7f17c20
+        DOWNLOAD_EXTRACT_TIMESTAMP ON
+    )
+
+    FetchContent_MakeAvailable(velopack)
+
+    configure_file(
+        ${velopack_SOURCE_DIR}/lib/velopack_libc_win_x64_msvc.dll
+        ${CMAKE_CURRENT_BINARY_DIR}/velopack_libc.dll
+        COPYONLY
+    )
+
+    add_library(velopack SHARED IMPORTED)
+
+    set_target_properties(velopack PROPERTIES
+        IMPORTED_LOCATION ${CMAKE_CURRENT_BINARY_DIR}/velopack_libc.dll
+        IMPORTED_IMPLIB ${velopack_SOURCE_DIR}/lib/velopack_libc_win_x64_msvc.dll.lib
+        INTERFACE_INCLUDE_DIRECTORIES ${velopack_SOURCE_DIR}/include
+    )
+
+    target_link_libraries(openkogama-launcher PRIVATE velopack)
+
+    add_custom_command(TARGET openkogama-launcher POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_FILE:velopack>
+            $<TARGET_FILE_DIR:openkogama-launcher>
+    )
+endif()
 
 target_link_libraries(openkogama-launcher
     PRIVATE
@@ -84,15 +116,10 @@ target_link_libraries(openkogama-launcher
         Qt::Network
         Qt::CorePrivate
         Qt::Concurrent
-        velopack
-)
-
-add_custom_command(TARGET openkogama-launcher POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:velopack> $<TARGET_FILE_DIR:openkogama-launcher>
 )
 
 install(TARGETS openkogama-launcher
-    BUNDLE  DESTINATION .
+    BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
@@ -102,19 +129,66 @@ qt_generate_deploy_app_script(
     OUTPUT_SCRIPT deploy_script
     NO_UNSUPPORTED_PLATFORM_ERROR
 )
+
 install(SCRIPT ${deploy_script})
-install(FILES $<TARGET_FILE:velopack> DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+if(WIN32)
+    install(FILES $<TARGET_FILE:velopack>
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+    )
+endif()
 
 option(BUILD_TESTING "Build launcher tests" OFF)
 include(CTest)
+
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
-    qt_add_executable(launcher-tests tests/serverspage_test.cpp src/serverspage.cpp src/serverspage.h src/tilegrid.cpp src/tilegrid.h src/settings.cpp src/settings.h src/tunnel.cpp src/tunnel.h src/sharebar.cpp src/sharebar.h src/serverconfigdialog.cpp src/serverconfigdialog.h
-        src/gamelauncher.cpp src/gamelauncher.h src/singleinstance.cpp src/singleinstance.h src/clientcontent.cpp src/clientcontent.h src/playerprofile.cpp src/playerprofile.h src/discordpresence.cpp src/discordpresence.h src/consolewindow.cpp src/consolewindow.h src/webplayerruntime.cpp src/webplayerruntime.h src/paths.cpp src/paths.h src/theme.cpp src/theme.h
-        src/launchdialog.cpp src/launchdialog.h src/launchdialog.ui src/assetinstaller.cpp src/assetinstaller.h)
-    target_include_directories(launcher-tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
-    target_link_libraries(launcher-tests PRIVATE Qt::Widgets Qt::Network Qt::Test Qt::CorePrivate)
-    qt_add_resources(launcher-tests "test_resources" PREFIX "/" BASE resources FILES resources/logo.png)
-    add_test(NAME launcher-servers COMMAND launcher-tests -o ${CMAKE_CURRENT_BINARY_DIR}/launcher-tests.txt,txt)
-    set_tests_properties(launcher-servers PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+    qt_add_executable(launcher-tests
+        tests/serverspage_test.cpp
+        src/serverspage.cpp src/serverspage.h
+        src/tilegrid.cpp src/tilegrid.h
+        src/settings.cpp src/settings.h
+        src/tunnel.cpp src/tunnel.h
+        src/sharebar.cpp src/sharebar.h
+        src/serverconfigdialog.cpp src/serverconfigdialog.h
+        src/gamelauncher.cpp src/gamelauncher.h
+        src/singleinstance.cpp src/singleinstance.h
+        src/clientcontent.cpp src/clientcontent.h
+        src/playerprofile.cpp src/playerprofile.h
+        src/discordpresence.cpp src/discordpresence.h
+        src/consolewindow.cpp src/consolewindow.h
+        src/webplayerruntime.cpp src/webplayerruntime.h
+        src/paths.cpp src/paths.h
+        src/theme.cpp src/theme.h
+        src/launchdialog.cpp src/launchdialog.h src/launchdialog.ui
+        src/assetinstaller.cpp src/assetinstaller.h
+        src/winexe.cpp
+    )
+
+    target_include_directories(launcher-tests PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(launcher-tests PRIVATE
+        Qt::Widgets
+        Qt::Network
+        Qt::Test
+        Qt::CorePrivate
+    )
+
+    qt_add_resources(launcher-tests "test_resources"
+        PREFIX "/"
+        BASE resources
+        FILES resources/logo.png
+    )
+
+    add_test(
+        NAME launcher-servers
+        COMMAND launcher-tests -o ${CMAKE_CURRENT_BINARY_DIR}/launcher-tests.txt,txt
+    )
+
+    set_tests_properties(launcher-servers PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    )
 endif()
