@@ -1,5 +1,6 @@
 #include "tunnel.h"
 #include "paths.h"
+#include "winexe.h"
 #include "settings.h"
 #include <QCoreApplication>
 #include <QDir>
@@ -8,7 +9,9 @@
 #include <QProcess>
 
 namespace {
+#ifdef Q_OS_WIN
 constexpr unsigned long CreateNoWindow = 0x08000000;
+#endif
 constexpr int CodeLength = 6;
 const QString Letters = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 }
@@ -78,13 +81,16 @@ Tunnel *Tunnel::find(const QString &code, QObject *parent)
 Tunnel::Tunnel(const QStringList &arguments, QObject *parent)
     : QObject(parent), m_process(new QProcess(this))
 {
-    m_process->setProgram(QDir(Paths::server()).filePath("openkogama-server.exe"));
     QStringList all = QStringList{"tunnel"} + arguments + QStringList{"--parent", QString::number(QCoreApplication::applicationPid())};
     if (const QString rendezvous = Settings::rendezvous(); !rendezvous.isEmpty()) all += {"--rendezvous", rendezvous};
-    m_process->setArguments(all);
-    m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+    WinExe::setCommand(m_process, QDir(Paths::server()).filePath("openkogama-server.exe"), all);
+    #ifdef Q_OS_WIN
+        m_process->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;
-    });
+        });
+    #endif
+
+    if (const QString rendezvous = Settings::rendezvous(); !rendezvous.isEmpty()) all += {"--rendezvous", rendezvous};
     connect(m_process, &QProcess::readyReadStandardOutput, this, [this]() {
         m_pending += m_process->readAllStandardOutput();
         for (qsizetype end = m_pending.indexOf('\n'); end >= 0; end = m_pending.indexOf('\n')) {
