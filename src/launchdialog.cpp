@@ -1,6 +1,7 @@
 #include "launchdialog.h"
 #include "assetinstaller.h"
 #include "paths.h"
+#include "winexe.h"
 #include "ui_launchdialog.h"
 #include <QDialogButtonBox>
 #include <QDir>
@@ -15,7 +16,10 @@
 #include <QTimer>
 #include <QUdpSocket>
 
+#ifdef Q_OS_WIN
 static constexpr unsigned long CreateNoWindow = 0x08000000;
+#endif
+
 static constexpr int PingAttempts = 200;
 static constexpr int PingTimeout = 150;
 static constexpr int AssetsEnd = 50;
@@ -154,12 +158,14 @@ void LaunchDialog::startServer() {
     if (m_offline) arguments.append("--offline");
     m_exitCode = 0;
     m_server = new QProcess(parentWidget());
-    m_server->setProgram(dir.filePath("openkogama-server.exe"));
+
+    WinExe::setCommand(m_server, dir.filePath("openkogama-server.exe"), arguments);
     m_server->setWorkingDirectory(Paths::serverData());
-    m_server->setArguments(arguments);
-    m_server->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
+    #ifdef Q_OS_WIN
+        m_server->setCreateProcessArgumentsModifier([](QProcess::CreateProcessArguments *args) {
         args->flags |= CreateNoWindow;
-    });
+        });
+    #endif
     connect(m_server, &QProcess::finished, this, [this](int exitCode) { m_exitCode = exitCode; });
     connect(m_server, &QProcess::finished, m_server, &QObject::deleteLater);
     m_server->start();
