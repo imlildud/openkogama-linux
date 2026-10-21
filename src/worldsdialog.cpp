@@ -558,9 +558,18 @@ void WorldsDialog::importWorlds(QStringList paths, QStringList failed) {
     QNetworkReply *reply = m_net->post(request, data);
     connect(reply, &QNetworkReply::finished, this, [this, reply, data, path, paths, failed]() mutable {
         reply->deleteLater();
-        int id = QJsonDocument::fromJson(reply->readAll()).object()["id"].toInt();
-        if (id == 0) failed << QFileInfo(path).fileName();
-        else findArchiveThumbnail(id, data);
+        const QByteArray body = reply->readAll();
+        int id = QJsonDocument::fromJson(body).object()["id"].toInt();
+        if (id == 0) {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            QString why = status ? "HTTP " + QString::number(status) : reply->errorString();
+            if (!body.isEmpty())
+                why += ": " + QString::fromUtf8(body.left(300));
+            qWarning("Import %s failed: %s", qUtf16Printable(path), qUtf16Printable(why));
+            failed << QFileInfo(path).fileName() + " (" + why + ")";
+        } else {
+            findArchiveThumbnail(id, data);
+        }
         loadWorlds(id);
         importWorlds(paths, failed);
     });

@@ -2,6 +2,7 @@
 #include "clientcontent.h"
 #include "launchdialog.h"
 #include "paths.h"
+#include "winexe.h"
 #include "playerprofile.h"
 #include "singleinstance.h"
 #include "webplayerruntime.h"
@@ -70,6 +71,8 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
     QDir logs(QDir(path).filePath("logs"));
     logs.mkpath(".");
     QString log = logs.filePath("client-" + QDateTime::currentDateTime().toString("yyyyMMdd-HHmmss-zzz") + ".log");
+    QString program;
+    QStringList gameArgs;
 
     if (WebPlayerRuntime::isWebPlayerFile(exe)) {
         QFile meta(QDir(path).filePath("instance.json"));
@@ -77,7 +80,7 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         if (meta.open(QIODevice::ReadOnly)) info = QJsonDocument::fromJson(meta.readAll()).object();
         QString version = info.value("version").toString();
         QString file = QDir::toNativeSeparators(QDir(path).filePath(exe));
-        client->setProgram(Paths::player());
+        program = (Paths::player());
         if (info.value("unityVersion").toString().startsWith("3.4")) {
             if (mode == "avatar") {
                 client->deleteLater();
@@ -86,14 +89,12 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
             }
             const QString username = viaCode && !nickname.isEmpty() ? QString::fromLatin1(QUrl::toPercentEncoding(nickname)) : "1";
             QString query = "?Username=" + username + "&Password=&PlanetName=" + QString::number(world) + "&EditMode=" + (mode == "play" ? "false" : "true");
-            client->setArguments({file + query, "--serve-as", url + "/kogama2012/WebPlayer.unity3d",
-                "--title", title, "--log", QDir::toNativeSeparators(log)});
+            gameArgs = {file + query, "--serve-as", url + "/kogama2012/WebPlayer.unity3d","--title", title, "--log", QDir::toNativeSeparators(log)};
         } else {
-            client->setArguments({file, "--version", version,
-                "--reply", "sendPlayerParams=" + session + "&client=" + version, "--title", title, "--log", QDir::toNativeSeparators(log)});
+            gameArgs = {file, "--version", version,"--reply", "sendPlayerParams=" + session + "&client=" + version,"--title", title, "--log", QDir::toNativeSeparators(log)};
         }
     } else {
-        client->setProgram(QDir(path).filePath(exe));
+        program = QDir(path).filePath(exe);
         QFile meta(QDir(path).filePath("instance.json"));
         QJsonObject info;
         if (meta.open(QIODevice::ReadOnly)) info = QJsonDocument::fromJson(meta.readAll()).object();
@@ -103,10 +104,11 @@ QProcess *GameLauncher::start(const QString &path, const QString &exe, const QSt
         QString unity = info.value("unityVersion").toString();
         if (!unity.isEmpty())
             session += "&unity=" + unity;
-        client->setArguments({"kogamaPackage:" + QString::fromLatin1(session.toUtf8().toBase64()), "-logFile", QDir::toNativeSeparators(log)});
+        gameArgs = {"kogamaPackage:" + QString::fromLatin1(session.toUtf8().toBase64()),"-logFile", QDir::toNativeSeparators(log)};
         SingleInstance::release(Paths::instances());
         ClientContent::prepare(path, url, version);
     }
+    WinExe::setCommand(client, program, gameArgs);
     client->setWorkingDirectory(path);
     client->setProcessEnvironment(env);
 
